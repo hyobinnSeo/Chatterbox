@@ -1,0 +1,194 @@
+const OpenAI = require('openai');
+const Utilities = require('../utils/Utilities');
+
+class TweetOperations {
+    constructor(page, personality, errorHandler) {
+        this.page = page;
+        this.personality = personality;
+        this.errorHandler = errorHandler;
+        this.recentTweets = [];
+
+        // Initialize OpenAI
+        this.openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+        });
+    }
+
+    async readFollowingTweets() {
+        try {
+            console.log(`${this.personality.name}: Reading tweets from Following tab...`);
+    
+            const followingTabSelectors = [
+                'a[href="/home"][aria-label*="Following"]',
+                '[data-testid="AppTabBar_Home_Link"]',
+                '[aria-label="Timeline: Following"]',
+                '[role="tab"][aria-selected="false"]'
+            ];
+    
+            let followingTab = null;
+            for (const selector of followingTabSelectors) {
+                followingTab = await this.page.$(selector);
+                if (followingTab) {
+                    await followingTab.click();
+                    break;
+                }
+            }
+    
+            if (!followingTab) {
+                const followingTabByText = await this.page.$x("//span[contains(text(), 'Following')]");
+                if (followingTabByText.length > 0) {
+                    await followingTabByText[0].click();
+                } else {
+                    throw new Error('Could not find Following tab');
+                }
+            }
+    
+            await Utilities.delay(3000);
+    
+            this.recentTweets = await this.page.evaluate(async () => {
+                const tweets = [];
+                let attempts = 0;
+                const maxAttempts = 5;
+                
+                while (tweets.length < 10 && attempts < maxAttempts) {
+                    const tweetElements = document.querySelectorAll('[data-testid="tweet"]');
+                    
+                    for (const tweet of tweetElements) {
+                        const nicknameElement = tweet.querySelector('[data-testid="User-Name"]');
+                        const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                        
+                        if (nicknameElement && contentElement) {
+                            const tweetData = {
+                                nickname: nicknameElement.textContent.trim(),
+                                content: contentElement.textContent.trim()
+                            };
+                            
+                            if (!tweets.some(t => t.nickname === tweetData.nickname && t.content === tweetData.content)) {
+                                tweets.push(tweetData);
+                                if (tweets.length >= 10) break;
+                            }
+                        }
+                    }
+                    
+                    if (tweets.length < 10) {
+                        window.scrollBy(0, 500);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                    
+                    attempts++;
+                }
+                
+                return tweets;
+            });
+    
+            console.log(`${this.personality.name}: Read ${this.recentTweets.length} tweets from timeline`);
+        } catch (error) {
+            await this.errorHandler.handleError(error, 'Reading tweets');
+        }
+    }
+
+    async generateTweet(maxAttempts = 3) {
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                let tweetContext = "";
+                if (this.recentTweets.length > 0) {
+                    tweetContext = "\n\nRecent tweets from your timeline:\n" +
+                        this.recentTweets.map(tweet =>
+                            `${tweet.nickname}: ${tweet.content}`
+                        ).join('\n') +
+                        "\n\nConsider these recent tweets and react to them in your response while staying in character.";
+                }
+
+                const systemPrompt = this.personality.prompt + tweetContext + 
+                    "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be rejected.";
+                const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
+
+                console.log('\nComplete prompt being sent to OpenAI:');
+                console.log('System message:', systemPrompt);
+                console.log('User message:', userPrompt);
+
+                const completion = await this.openai.chat.completions.create({
+                    model: "gpt-4o-mini",
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt }
+                    ],
+                    max_tokens: 100,
+                    temperature: 0.8
+                });
+
+                const tweet = completion.choices[0].message.content;
+
+                if (tweet.length <= 280) {
+                    console.log(`${this.personality.name}: Generated valid tweet (${tweet.length} characters)`);
+                    return tweet;
+                }
+
+                console.log(`${this.personality.name}: Generated tweet exceeded character limit (${tweet.length}/280), attempt ${attempt}/${maxAttempts}`);
+
+                if (attempt === maxAttempts) {
+                    const truncatedTweet = tweet.slice(0, 277) + "...";
+                    console.log(`${this.personality.name}: Truncated tweet to fit character limit`);
+                    return truncatedTweet;
+                }
+            } catch (error) {
+                console.error(`Tweet generation failed for ${this.personality.name} (attempt ${attempt}/${maxAttempts}):`, error);
+                if (attempt === maxAttempts) throw error;
+            }
+        }
+    }
+
+    async postTweet(tweet) {
+        try {
+            await Utilities.delay(2000);
+
+            const composeSelector = '[data-testid="tweetButtonInline"],[data-testid="SideNav_NewTweet_Button"]';
+            const composeButton = await this.page.waitForSelector(composeSelector);
+            await composeButton.click();
+            await Utilities.delay(1500);
+
+            const modalSelector = '[aria-modal="true"]';
+            await this.page.waitForSelector(modalSelector);
+
+            const textareaSelector = '[data-testid="tweetTextarea_0"]';
+            const textarea = await this.page.waitForSelector(textareaSelector);
+            await textarea.click();
+            await this.page.keyboard.type(tweet, { delay: 50 });
+            await Utilities.delay(1000);
+
+            const postButtonSelector = '[data-testid="tweetButton"]';
+            await this.page.waitForSelector(postButtonSelector, { visible: true });
+            const postButton = await this.page.$(postButtonSelector);
+
+            if (!postButton) {
+                throw new Error('Post button not found');
+            }
+
+            await this.page.evaluate(button => button.click(), postButton);
+
+            if (!await this.page.evaluate(() => document.querySelector('[data-testid="tweetButton"]'))) {
+                await postButton.click();
+            }
+
+            await Utilities.delay(2000);
+            try {
+                const popup = await this.page.$('[role="dialog"]');
+                if (popup) {
+                    const gotItButton = await this.page.$('text/Got it');
+                    if (gotItButton) await gotItButton.click();
+                    const viewButton = await this.page.$('text/View');
+                    if (viewButton) await viewButton.click();
+                }
+            } catch (popupError) {
+                console.log('No popup found, continuing...');
+            }
+
+            await Utilities.delay(3000);
+            console.log(`${this.personality.name} successfully tweeted: ${tweet}`);
+        } catch (error) {
+            await this.errorHandler.handleError(error, 'Posting tweet');
+        }
+    }
+}
+
+module.exports = TweetOperations;

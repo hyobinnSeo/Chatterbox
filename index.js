@@ -1,6 +1,6 @@
 require('dotenv').config();
 const cron = require('node-cron');
-const TwitterBot = require('./bot');
+const TwitterBot = require('./src/TwitterBot');
 const georgeWashington = require('./personalities/george-washington');
 const johnAdams = require('./personalities/john-adams');
 const thomasJefferson = require('./personalities/thomas-jefferson');

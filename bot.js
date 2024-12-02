@@ -211,7 +211,6 @@ class TwitterBot {
                 '[role="tab"][aria-selected="false"]'
             ];
     
-            // Try each selector
             let followingTab = null;
             for (const selector of followingTabSelectors) {
                 followingTab = await this.page.$(selector);
@@ -222,7 +221,6 @@ class TwitterBot {
             }
     
             if (!followingTab) {
-                // Alternative: Find by XPath containing text
                 const followingTabByText = await this.page.$x("//span[contains(text(), 'Following')]");
                 if (followingTabByText.length > 0) {
                     await followingTabByText[0].click();
@@ -233,24 +231,41 @@ class TwitterBot {
     
             await this.delay(3000);
     
-            // Rest of the tweet reading logic remains unchanged
-            const tweets = await this.page.evaluate(() => {
-                const tweetElements = document.querySelectorAll('[data-testid="tweet"]');
+            // Updated tweet reading logic with scroll and retry
+            const tweets = await this.page.evaluate(async () => {
                 const tweets = [];
-    
-                for (let i = 0; i < Math.min(10, tweetElements.length); i++) {
-                    const tweet = tweetElements[i];
-                    const nicknameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    const contentElement = tweet.querySelector('[data-testid="tweetText"]');
-    
-                    if (nicknameElement && contentElement) {
-                        tweets.push({
-                            nickname: nicknameElement.textContent.trim(),
-                            content: contentElement.textContent.trim()
-                        });
+                let attempts = 0;
+                const maxAttempts = 5;
+                
+                while (tweets.length < 10 && attempts < maxAttempts) {
+                    const tweetElements = document.querySelectorAll('[data-testid="tweet"]');
+                    
+                    for (const tweet of tweetElements) {
+                        const nicknameElement = tweet.querySelector('[data-testid="User-Name"]');
+                        const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                        
+                        if (nicknameElement && contentElement) {
+                            const tweetData = {
+                                nickname: nicknameElement.textContent.trim(),
+                                content: contentElement.textContent.trim()
+                            };
+                            
+                            // Check if tweet is already in array
+                            if (!tweets.some(t => t.nickname === tweetData.nickname && t.content === tweetData.content)) {
+                                tweets.push(tweetData);
+                                if (tweets.length >= 10) break;
+                            }
+                        }
                     }
+                    
+                    if (tweets.length < 10) {
+                        window.scrollBy(0, 500);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                    
+                    attempts++;
                 }
-    
+                
                 return tweets;
             });
     
