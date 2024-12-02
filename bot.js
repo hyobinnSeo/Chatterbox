@@ -10,6 +10,7 @@ class TwitterBot {
         this.personality = personality;
         this.browser = null;
         this.page = null;
+        this.recentTweets = [];
 
         // Initialize OpenAI
         this.openai = new OpenAI({
@@ -56,7 +57,7 @@ class TwitterBot {
 
     async init() {
         const profileDir = await this.createChromePrefs();
-        
+
         this.browser = await puppeteer.launch({
             headless: false,
             defaultViewport: { width: 1280, height: 800 },
@@ -73,7 +74,7 @@ class TwitterBot {
         });
 
         this.page = await this.browser.newPage();
-        
+
         // Set language preferences
         await this.page.setExtraHTTPHeaders({
             'Accept-Language': 'en-US,en;q=0.9'
@@ -82,10 +83,10 @@ class TwitterBot {
         // Override language settings
         await this.page.evaluateOnNewDocument(() => {
             Object.defineProperty(navigator, 'language', {
-                get: function() { return 'en-US'; }
+                get: function () { return 'en-US'; }
             });
             Object.defineProperty(navigator, 'languages', {
-                get: function() { return ['en-US', 'en']; }
+                get: function () { return ['en-US', 'en']; }
             });
         });
     }
@@ -97,13 +98,13 @@ class TwitterBot {
     async login() {
         try {
             console.log(`${this.personality.name}: Starting login process...`);
-            
+
             // Navigate to Twitter login
             await this.page.goto('https://twitter.com/i/flow/login', {
                 waitUntil: 'networkidle0'
             });
             console.log(`${this.personality.name}: Loaded login page`);
-            
+
             await this.delay(3000);
 
             // Type username
@@ -111,12 +112,12 @@ class TwitterBot {
             const usernameField = await this.page.waitForSelector('input[autocomplete="username"]', { visible: true });
             await usernameField.type(this.username, { delay: 100 });
             console.log(`${this.personality.name}: Entered username`);
-            
+
             await this.delay(1000);
 
             // Updated Next button click logic with more precise targeting
             console.log(`${this.personality.name}: Looking for Next button...`);
-            
+
             // Wait for any potential loading states to complete
             await this.delay(2000);
 
@@ -152,12 +153,12 @@ class TwitterBot {
             const passwordField = await this.page.waitForSelector('input[type="password"]', { visible: true });
             await passwordField.type(this.password, { delay: 100 });
             console.log(`${this.personality.name}: Entered password`);
-            
+
             await this.delay(1000);
 
             // Updated login button click logic with more precise targeting
             console.log(`${this.personality.name}: Looking for login button...`);
-            
+
             // Wait for any potential loading states to complete
             await this.delay(2000);
 
@@ -182,7 +183,7 @@ class TwitterBot {
 
             // Wait for navigation to complete
             await this.delay(5000);
-            
+
             console.log(`${this.personality.name}: Login completed successfully`);
         } catch (error) {
             console.error(`Login failed for ${this.personality.name}:`, error);
@@ -198,19 +199,102 @@ class TwitterBot {
         }
     }
 
+    async readFollowingTweets() {
+        try {
+            console.log(`${this.personality.name}: Reading tweets from Following tab...`);
+    
+            // Updated selectors without :has-text
+            const followingTabSelectors = [
+                'a[href="/home"][aria-label*="Following"]',
+                '[data-testid="AppTabBar_Home_Link"]',
+                '[aria-label="Timeline: Following"]',
+                '[role="tab"][aria-selected="false"]'
+            ];
+    
+            // Try each selector
+            let followingTab = null;
+            for (const selector of followingTabSelectors) {
+                followingTab = await this.page.$(selector);
+                if (followingTab) {
+                    await followingTab.click();
+                    break;
+                }
+            }
+    
+            if (!followingTab) {
+                // Alternative: Find by XPath containing text
+                const followingTabByText = await this.page.$x("//span[contains(text(), 'Following')]");
+                if (followingTabByText.length > 0) {
+                    await followingTabByText[0].click();
+                } else {
+                    throw new Error('Could not find Following tab');
+                }
+            }
+    
+            await this.delay(3000);
+    
+            // Rest of the tweet reading logic remains unchanged
+            const tweets = await this.page.evaluate(() => {
+                const tweetElements = document.querySelectorAll('[data-testid="tweet"]');
+                const tweets = [];
+    
+                for (let i = 0; i < Math.min(10, tweetElements.length); i++) {
+                    const tweet = tweetElements[i];
+                    const nicknameElement = tweet.querySelector('[data-testid="User-Name"]');
+                    const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+    
+                    if (nicknameElement && contentElement) {
+                        tweets.push({
+                            nickname: nicknameElement.textContent.trim(),
+                            content: contentElement.textContent.trim()
+                        });
+                    }
+                }
+    
+                return tweets;
+            });
+    
+            this.recentTweets = tweets;
+            console.log(`${this.personality.name}: Read ${tweets.length} tweets from timeline`);
+        } catch (error) {
+            console.error(`Reading tweets failed for ${this.personality.name}:`, error);
+            await this.takeErrorScreenshot('read-tweets-error');
+            throw error;
+        }
+    }
+
     async generateTweet(maxAttempts = 3) {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
+                // Create context from recent tweets
+                let tweetContext = "";
+                if (this.recentTweets.length > 0) {
+                    tweetContext = "\n\nRecent tweets from your timeline:\n" +
+                        this.recentTweets.map(tweet =>
+                            `${tweet.nickname}: ${tweet.content}`
+                        ).join('\n') +
+                        "\n\nConsider these recent tweets and react to them in your response while staying in character.";
+                }
+
+                // Construct the complete prompt
+                const systemPrompt = this.personality.prompt + tweetContext + "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be rejected.";
+                const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
+
+                // Print the complete prompt to console
+                console.log('\nComplete prompt being sent to OpenAI:');
+                console.log('System message:', systemPrompt);
+                console.log('User message:', userPrompt);
+
                 const completion = await this.openai.chat.completions.create({
                     model: "gpt-4o-mini",
                     messages: [
                         {
                             role: "system",
-                            content: this.personality.prompt + "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be rejected."
+                            content: systemPrompt
                         },
                         {
                             role: "user",
-                            content: "Generate a single tweet (max 280 characters) about your current thoughts or activities. Be concise and impactful."
+                            content: userPrompt
                         }
                     ],
                     max_tokens: 100,
@@ -218,15 +302,15 @@ class TwitterBot {
                 });
 
                 const tweet = completion.choices[0].message.content;
-                
+
                 // Check if tweet is within character limit
                 if (tweet.length <= 280) {
                     console.log(`${this.personality.name}: Generated valid tweet (${tweet.length} characters)`);
                     return tweet;
                 }
-                
+
                 console.log(`${this.personality.name}: Generated tweet exceeded character limit (${tweet.length}/280), attempt ${attempt}/${maxAttempts}`);
-                
+
                 if (attempt === maxAttempts) {
                     // On final attempt, truncate the tweet to fit
                     const truncatedTweet = tweet.slice(0, 277) + "...";
@@ -243,41 +327,41 @@ class TwitterBot {
     async postTweet(tweet) {
         try {
             await this.delay(2000);
-    
+
             // Click compose tweet button to ensure modal appears
             const composeSelector = '[data-testid="tweetButtonInline"],[data-testid="SideNav_NewTweet_Button"]';
             const composeButton = await this.page.waitForSelector(composeSelector);
             await composeButton.click();
             await this.delay(1500);
-    
+
             // Verify we're in the compose modal by checking backdrop
             const modalSelector = '[aria-modal="true"]';
             await this.page.waitForSelector(modalSelector);
-    
+
             // Type the tweet
             const textareaSelector = '[data-testid="tweetTextarea_0"]';
             const textarea = await this.page.waitForSelector(textareaSelector);
             await textarea.click();
             await this.page.keyboard.type(tweet, { delay: 50 });
             await this.delay(1000);
-    
+
             // Updated post button click logic with retry
             const postButtonSelector = '[data-testid="tweetButton"]';
             await this.page.waitForSelector(postButtonSelector, { visible: true });
             const postButton = await this.page.$(postButtonSelector);
-            
+
             if (!postButton) {
                 throw new Error('Post button not found');
             }
-            
+
             // Force click with JavaScript
             await this.page.evaluate(button => button.click(), postButton);
-            
+
             // Fallback to regular click if needed
             if (!await this.page.evaluate(() => document.querySelector('[data-testid="tweetButton"]'))) {
                 await postButton.click();
             }
-            
+
             // Handle popups
             await this.delay(2000);
             try {
@@ -291,7 +375,7 @@ class TwitterBot {
             } catch (popupError) {
                 console.log('No popup found, continuing...');
             }
-            
+
             await this.delay(3000);
             console.log(`${this.personality.name} successfully tweeted: ${tweet}`);
         } catch (error) {
@@ -304,15 +388,15 @@ class TwitterBot {
     async logout() {
         try {
             await this.delay(3000);
-            
+
             const sidebarAccountSelector = '[data-testid="SideNav_AccountSwitcher_Button"]';
             await this.page.waitForSelector(sidebarAccountSelector, { visible: true });
             await this.page.click(sidebarAccountSelector);
             await this.delay(1500);
-    
+
             const menuItems = await this.page.$$('[role="menuitem"]');
             let logoutFound = false;
-    
+
             for (const item of menuItems) {
                 const itemText = await this.page.evaluate(el => el.textContent, item);
                 if (itemText.toLowerCase().includes('log out')) {
@@ -321,16 +405,16 @@ class TwitterBot {
                     break;
                 }
             }
-    
+
             if (!logoutFound) {
                 throw new Error('Could not find Logout menu item');
             }
-    
+
             // Handle confirmation dialog
             await this.delay(1500);
             const logoutButton = await this.page.waitForSelector('[data-testid="confirmationSheetConfirm"]');
             await logoutButton.click();
-    
+
             await this.delay(3000);
             console.log(`${this.personality.name}: Successfully logged out`);
         } catch (error) {
@@ -339,7 +423,7 @@ class TwitterBot {
             throw error;
         }
     }
-    
+
     async takeErrorScreenshot(prefix) {
         try {
             const errorPath = path.join(__dirname, 'errors', `${prefix}-${Date.now()}.png`);
@@ -360,6 +444,7 @@ class TwitterBot {
         try {
             await this.init();
             await this.login();
+            await this.readFollowingTweets();
             const tweet = await this.generateTweet();
             await this.postTweet(tweet);
             await this.logout();

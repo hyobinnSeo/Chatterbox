@@ -34,20 +34,25 @@ const bots = [
 async function runAllBots() {
     console.log('Starting tweet cycle...');
     
-    for (const bot of bots) {
-        try {
-            const twitterBot = new TwitterBot(bot.credentials, bot.personality);
-            await twitterBot.run();
-            
-            // Add random delay between bots (1-5 minutes) to avoid suspicious activity
-            const delay = Math.floor(Math.random() * (300000 - 60000) + 60000);
-            await new Promise(resolve => setTimeout(resolve, delay));
-        } catch (error) {
-            console.error(`Error running ${bot.personality.name} bot:`, error);
+    try {
+        for (const bot of bots) {
+            try {
+                const twitterBot = new TwitterBot(bot.credentials, bot.personality);
+                await twitterBot.run();
+                
+                // Add random delay between bots (1-5 minutes) to avoid suspicious activity
+                const delay = Math.floor(Math.random() * (300000 - 60000) + 60000);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } catch (error) {
+                console.error(`Error running ${bot.personality.name} bot:`, error);
+                // Continue with next bot instead of stopping the entire cycle
+            }
         }
+    } catch (error) {
+        console.error('Fatal error in tweet cycle:', error);
+    } finally {
+        console.log('Tweet cycle completed');
     }
-    
-    console.log('Tweet cycle completed');
 }
 
 // Schedule tweets using cron
