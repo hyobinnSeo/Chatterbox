@@ -244,54 +244,80 @@ class TwitterBot {
         try {
             await this.delay(2000);
     
-            // Click compose tweet button
             const composeSelector = 'a[data-testid="SideNav_NewTweet_Button"]';
             await this.page.waitForSelector(composeSelector, { visible: true });
             await this.page.click(composeSelector);
             await this.delay(1500);
     
-            // Type the tweet
             const textareaSelector = 'div[data-testid="tweetTextarea_0"]';
             await this.page.waitForSelector(textareaSelector, { visible: true });
             await this.page.click(textareaSelector);
             await this.page.keyboard.type(tweet, { delay: 50 });
             await this.delay(1000);
     
-            // Click post button and ensure the click is registered
             const postButtonSelector = '[data-testid="tweetButton"]';
             await this.page.waitForSelector(postButtonSelector, { visible: true });
+            await this.page.click(postButtonSelector);
             
-            // Use evaluate to ensure the click is properly triggered
-            await this.page.evaluate((selector) => {
-                const button = document.querySelector(selector);
-                if (button) {
-                    button.click();
-                    return true;
-                }
-                throw new Error('Post button not found');
-            }, postButtonSelector);
-    
-            // Wait for the tweet to be posted (tweet compose modal should disappear)
-            await this.page.waitForFunction(
-                (textareaSelector) => !document.querySelector(textareaSelector),
-                { timeout: 10000 },
-                textareaSelector
-            );
-    
-            // Additional verification - check if success notification appears
-            try {
-                await this.page.waitForSelector('[data-testid="toast"]', { 
-                    timeout: 5000 
-                });
-            } catch (e) {
-                console.log(`${this.personality.name}: No success toast found, but continuing...`);
-            }
+            // Simple delay to allow post to complete
+            await this.delay(5000);
     
             console.log(`${this.personality.name} successfully tweeted: ${tweet}`);
-            await this.delay(3000); // Wait for any animations to complete
+            await this.delay(2000);
         } catch (error) {
             console.error(`Posting tweet failed for ${this.personality.name}:`, error);
             await this.takeErrorScreenshot('post-error');
+            throw error;
+        }
+    }
+
+    async logout() {
+        try {
+            // Click account menu
+            await this.page.waitForSelector('[data-testid="Account"]', { visible: true });
+            await this.page.click('[data-testid="Account"]');
+            await this.delay(1000);
+
+            // Click Log out
+            const menuItems = await this.page.$$('[role="menuitem"]');
+            let logoutFound = false;
+
+            for (const item of menuItems) {
+                const itemText = await this.page.evaluate(el => el.textContent, item);
+                if (itemText.toLowerCase().includes('log out')) {
+                    await item.click();
+                    logoutFound = true;
+                    break;
+                }
+            }
+
+            if (!logoutFound) {
+                throw new Error('Could not find Logout menu item');
+            }
+
+            // Confirm logout
+            await this.delay(1000);
+            const confirmButtons = await this.page.$$('[role="button"]');
+            let confirmFound = false;
+
+            for (const button of confirmButtons) {
+                const buttonText = await this.page.evaluate(el => el.textContent, button);
+                if (buttonText.toLowerCase().includes('log out')) {
+                    await button.click();
+                    confirmFound = true;
+                    break;
+                }
+            }
+
+            if (!confirmFound) {
+                throw new Error('Could not find Logout confirmation button');
+            }
+
+            await this.delay(2000);
+            console.log(`${this.personality.name}: Successfully logged out`);
+        } catch (error) {
+            console.error(`Logout failed for ${this.personality.name}:`, error);
+            await this.takeErrorScreenshot('logout-error');
             throw error;
         }
     }
@@ -318,12 +344,14 @@ class TwitterBot {
             await this.login();
             const tweet = await this.generateTweet();
             await this.postTweet(tweet);
+            await this.logout();
+            await this.close();
         } catch (error) {
             console.error(`Bot run failed for ${this.personality.name}:`, error);
             if (this.browser) {
                 await this.browser.close();
             }
-            throw error; // Re-throw the error to be handled by the caller
+            throw error;
         }
     }
 }
