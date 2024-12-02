@@ -227,24 +227,87 @@ class TwitterBot {
             // Wait for the home page to load
             await this.delay(2000);
 
-            // Click compose tweet button (Post button)
-            const composeButton = await this.page.waitForSelector('a[href="/compose/tweet"]');
+            // Try multiple possible selectors for the compose tweet button
+            const possibleSelectors = [
+                'div[data-testid="tweetButtonInline"]',
+                'div[data-testid="tweetButton"]',
+                'a[data-testid="SideNav_NewTweet_Button"]',
+                'div[aria-label="Post"]',
+                'div[aria-label="Tweet"]'
+            ];
+
+            let composeButton = null;
+            for (const selector of possibleSelectors) {
+                composeButton = await this.page.$(selector);
+                if (composeButton) {
+                    console.log(`${this.personality.name}: Found compose button with selector: ${selector}`);
+                    break;
+                }
+            }
+
+            if (!composeButton) {
+                throw new Error('Could not find compose tweet button with any known selector');
+            }
+
             await composeButton.click();
             await this.delay(2000);
 
-            // Type tweet
-            const tweetTextarea = await this.page.waitForSelector('div[data-testid="tweetTextarea_0"]');
+            // Try multiple possible selectors for the tweet textarea
+            const textareaSelectors = [
+                'div[data-testid="tweetTextarea_0"]',
+                'div[role="textbox"][aria-label="Post text"]',
+                'div[role="textbox"][aria-label="Tweet text"]'
+            ];
+
+            let tweetTextarea = null;
+            for (const selector of textareaSelectors) {
+                tweetTextarea = await this.page.$(selector);
+                if (tweetTextarea) {
+                    console.log(`${this.personality.name}: Found tweet textarea with selector: ${selector}`);
+                    break;
+                }
+            }
+
+            if (!tweetTextarea) {
+                throw new Error('Could not find tweet textarea with any known selector');
+            }
+
             await tweetTextarea.type(tweet, { delay: 50 });
             await this.delay(1000);
 
-            // Click Post button
-            const postButton = await this.page.waitForSelector('div[data-testid="tweetButton"]');
+            // Try multiple possible selectors for the post button
+            const postButtonSelectors = [
+                'div[data-testid="tweetButton"]',
+                'div[data-testid="postButton"]',
+                'div[aria-label="Post"]'
+            ];
+
+            let postButton = null;
+            for (const selector of postButtonSelectors) {
+                postButton = await this.page.$(selector);
+                if (postButton) {
+                    console.log(`${this.personality.name}: Found post button with selector: ${selector}`);
+                    break;
+                }
+            }
+
+            if (!postButton) {
+                throw new Error('Could not find post button with any known selector');
+            }
+
             await postButton.click();
             await this.delay(2000);
 
             console.log(`${this.personality.name} successfully tweeted: ${tweet}`);
         } catch (error) {
             console.error(`Posting tweet failed for ${this.personality.name}:`, error);
+            // Take a screenshot when posting fails
+            try {
+                await this.page.screenshot({ path: `post-error-${Date.now()}.png` });
+                console.log(`${this.personality.name}: Saved error screenshot`);
+            } catch (screenshotError) {
+                console.error('Failed to save error screenshot:', screenshotError);
+            }
             throw error;
         }
     }
