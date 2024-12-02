@@ -188,8 +188,9 @@ class TwitterBot {
             console.error(`Login failed for ${this.personality.name}:`, error);
             // Take a screenshot when login fails
             try {
-                await this.page.screenshot({ path: `login-error-${Date.now()}.png` });
-                console.log(`${this.personality.name}: Saved error screenshot`);
+                const errorPath = path.join(__dirname, 'errors', `login-error-${Date.now()}.png`);
+                await this.page.screenshot({ path: errorPath });
+                console.log(`${this.personality.name}: Saved error screenshot to ${errorPath}`);
             } catch (screenshotError) {
                 console.error('Failed to save error screenshot:', screenshotError);
             }
@@ -197,28 +198,45 @@ class TwitterBot {
         }
     }
 
-    async generateTweet() {
-        try {
-            const completion = await this.openai.chat.completions.create({
-                model: "gpt-3.5-turbo",
-                messages: [
-                    {
-                        role: "system",
-                        content: this.personality.prompt
-                    },
-                    {
-                        role: "user",
-                        content: "Generate a single tweet (max 280 characters) about your current thoughts or activities."
-                    }
-                ],
-                max_tokens: 100,
-                temperature: 0.8
-            });
+    async generateTweet(maxAttempts = 3) {
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                const completion = await this.openai.chat.completions.create({
+                    model: "gpt-3.5-turbo",
+                    messages: [
+                        {
+                            role: "system",
+                            content: this.personality.prompt + "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be rejected."
+                        },
+                        {
+                            role: "user",
+                            content: "Generate a single tweet (max 280 characters) about your current thoughts or activities. Be concise and impactful."
+                        }
+                    ],
+                    max_tokens: 100,
+                    temperature: 0.8
+                });
 
-            return completion.choices[0].message.content;
-        } catch (error) {
-            console.error(`Tweet generation failed for ${this.personality.name}:`, error);
-            throw error;
+                const tweet = completion.choices[0].message.content;
+                
+                // Check if tweet is within character limit
+                if (tweet.length <= 280) {
+                    console.log(`${this.personality.name}: Generated valid tweet (${tweet.length} characters)`);
+                    return tweet;
+                }
+                
+                console.log(`${this.personality.name}: Generated tweet exceeded character limit (${tweet.length}/280), attempt ${attempt}/${maxAttempts}`);
+                
+                if (attempt === maxAttempts) {
+                    // On final attempt, truncate the tweet to fit
+                    const truncatedTweet = tweet.slice(0, 277) + "...";
+                    console.log(`${this.personality.name}: Truncated tweet to fit character limit`);
+                    return truncatedTweet;
+                }
+            } catch (error) {
+                console.error(`Tweet generation failed for ${this.personality.name} (attempt ${attempt}/${maxAttempts}):`, error);
+                if (attempt === maxAttempts) throw error;
+            }
         }
     }
 
@@ -279,7 +297,9 @@ class TwitterBot {
             const postButtonSelectors = [
                 'div[data-testid="tweetButton"]',
                 'div[data-testid="postButton"]',
-                'div[aria-label="Post"]'
+                'div[aria-label="Post"]',
+                'div[data-testid="tweetButtonInline"]',
+                '[data-testid="tweetButton"]'  // Added new selector without div specification
             ];
 
             let postButton = null;
@@ -303,8 +323,9 @@ class TwitterBot {
             console.error(`Posting tweet failed for ${this.personality.name}:`, error);
             // Take a screenshot when posting fails
             try {
-                await this.page.screenshot({ path: `post-error-${Date.now()}.png` });
-                console.log(`${this.personality.name}: Saved error screenshot`);
+                const errorPath = path.join(__dirname, 'errors', `post-error-${Date.now()}.png`);
+                await this.page.screenshot({ path: errorPath });
+                console.log(`${this.personality.name}: Saved error screenshot to ${errorPath}`);
             } catch (screenshotError) {
                 console.error('Failed to save error screenshot:', screenshotError);
             }
