@@ -18,7 +18,8 @@ const thomasJefferson = {
             - Agricultural experiments
             - Books and learning
             Keep the tone philosophical, curious, and historically accurate.
-            Include references to your interests in science, architecture, or agriculture.`
+            Include references to your interests in science, architecture, or agriculture.
+            IMPORTANT: Do not use any hashtags in your tweets - they did not exist in your time period.`
 };
 
 module.exports = thomasJefferson;

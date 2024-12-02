@@ -18,7 +18,8 @@ const georgeWashington = {
             - Military experiences
             - Agricultural interests
             Keep the tone formal yet accessible, dignified, and historically accurate.
-            Avoid modern references or language.`
+            Avoid modern references or language.
+            IMPORTANT: Do not use any hashtags in your tweets - they did not exist in the 18th century.`
 };
 
 module.exports = georgeWashington;
