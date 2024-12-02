@@ -242,94 +242,67 @@ class TwitterBot {
 
     async postTweet(tweet) {
         try {
-            // Wait for the home page to load
             await this.delay(2000);
-
-            // Try multiple possible selectors for the compose tweet button
-            const possibleSelectors = [
-                'div[data-testid="tweetButtonInline"]',
-                'div[data-testid="tweetButton"]',
-                'a[data-testid="SideNav_NewTweet_Button"]',
-                'div[aria-label="Post"]',
-                'div[aria-label="Tweet"]'
-            ];
-
-            let composeButton = null;
-            for (const selector of possibleSelectors) {
-                composeButton = await this.page.$(selector);
-                if (composeButton) {
-                    console.log(`${this.personality.name}: Found compose button with selector: ${selector}`);
-                    break;
-                }
-            }
-
-            if (!composeButton) {
-                throw new Error('Could not find compose tweet button with any known selector');
-            }
-
-            await composeButton.click();
-            await this.delay(2000);
-
-            // Try multiple possible selectors for the tweet textarea
-            const textareaSelectors = [
-                'div[data-testid="tweetTextarea_0"]',
-                'div[role="textbox"][aria-label="Post text"]',
-                'div[role="textbox"][aria-label="Tweet text"]'
-            ];
-
-            let tweetTextarea = null;
-            for (const selector of textareaSelectors) {
-                tweetTextarea = await this.page.$(selector);
-                if (tweetTextarea) {
-                    console.log(`${this.personality.name}: Found tweet textarea with selector: ${selector}`);
-                    break;
-                }
-            }
-
-            if (!tweetTextarea) {
-                throw new Error('Could not find tweet textarea with any known selector');
-            }
-
-            await tweetTextarea.type(tweet, { delay: 50 });
+    
+            // Click compose tweet button
+            const composeSelector = 'a[data-testid="SideNav_NewTweet_Button"]';
+            await this.page.waitForSelector(composeSelector, { visible: true });
+            await this.page.click(composeSelector);
+            await this.delay(1500);
+    
+            // Type the tweet
+            const textareaSelector = 'div[data-testid="tweetTextarea_0"]';
+            await this.page.waitForSelector(textareaSelector, { visible: true });
+            await this.page.click(textareaSelector);
+            await this.page.keyboard.type(tweet, { delay: 50 });
             await this.delay(1000);
-
-            // Try multiple possible selectors for the post button
-            const postButtonSelectors = [
-                'div[data-testid="tweetButton"]',
-                'div[data-testid="postButton"]',
-                'div[aria-label="Post"]',
-                'div[data-testid="tweetButtonInline"]',
-                '[data-testid="tweetButton"]'  // Added new selector without div specification
-            ];
-
-            let postButton = null;
-            for (const selector of postButtonSelectors) {
-                postButton = await this.page.$(selector);
-                if (postButton) {
-                    console.log(`${this.personality.name}: Found post button with selector: ${selector}`);
-                    break;
+    
+            // Click post button and ensure the click is registered
+            const postButtonSelector = '[data-testid="tweetButton"]';
+            await this.page.waitForSelector(postButtonSelector, { visible: true });
+            
+            // Use evaluate to ensure the click is properly triggered
+            await this.page.evaluate((selector) => {
+                const button = document.querySelector(selector);
+                if (button) {
+                    button.click();
+                    return true;
                 }
+                throw new Error('Post button not found');
+            }, postButtonSelector);
+    
+            // Wait for the tweet to be posted (tweet compose modal should disappear)
+            await this.page.waitForFunction(
+                (textareaSelector) => !document.querySelector(textareaSelector),
+                { timeout: 10000 },
+                textareaSelector
+            );
+    
+            // Additional verification - check if success notification appears
+            try {
+                await this.page.waitForSelector('[data-testid="toast"]', { 
+                    timeout: 5000 
+                });
+            } catch (e) {
+                console.log(`${this.personality.name}: No success toast found, but continuing...`);
             }
-
-            if (!postButton) {
-                throw new Error('Could not find post button with any known selector');
-            }
-
-            await postButton.click();
-            await this.delay(2000);
-
+    
             console.log(`${this.personality.name} successfully tweeted: ${tweet}`);
+            await this.delay(3000); // Wait for any animations to complete
         } catch (error) {
             console.error(`Posting tweet failed for ${this.personality.name}:`, error);
-            // Take a screenshot when posting fails
-            try {
-                const errorPath = path.join(__dirname, 'errors', `post-error-${Date.now()}.png`);
-                await this.page.screenshot({ path: errorPath });
-                console.log(`${this.personality.name}: Saved error screenshot to ${errorPath}`);
-            } catch (screenshotError) {
-                console.error('Failed to save error screenshot:', screenshotError);
-            }
+            await this.takeErrorScreenshot('post-error');
             throw error;
+        }
+    }
+
+    async takeErrorScreenshot(prefix) {
+        try {
+            const errorPath = path.join(__dirname, 'errors', `${prefix}-${Date.now()}.png`);
+            await this.page.screenshot({ path: errorPath, fullPage: true });
+            console.log(`${this.personality.name}: Saved error screenshot to ${errorPath}`);
+        } catch (screenshotError) {
+            console.error('Failed to save error screenshot:', screenshotError);
         }
     }
 
