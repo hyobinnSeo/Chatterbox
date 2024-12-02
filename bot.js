@@ -202,7 +202,7 @@ class TwitterBot {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 const completion = await this.openai.chat.completions.create({
-                    model: "gpt-3.5-turbo",
+                    model: "gpt-4o-mini",
                     messages: [
                         {
                             role: "system",
