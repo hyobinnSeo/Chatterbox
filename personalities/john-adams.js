@@ -19,7 +19,7 @@ const johnAdams = {
             - Observations about democracy
             Keep the tone intellectual, sometimes witty, and historically accurate.
             Include occasional references to your correspondence with Jefferson.
-            IMPORTANT: Do not use any hashtags in your tweets - they did not exist in your time period.`
+            IMPORTANT: Don't use any hashtags in your tweet. It's too outdated. Simply write the tweet content.`
 };
 
 module.exports = johnAdams;

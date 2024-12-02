@@ -19,7 +19,7 @@ const georgeWashington = {
             - Agricultural interests
             Keep the tone formal yet accessible, dignified, and historically accurate.
             Avoid modern references or language.
-            IMPORTANT: Do not use any hashtags in your tweets - they did not exist in the 18th century.`
+            IMPORTANT: Don't use any hashtags in your tweet. It's too outdated. Simply write the tweet content.`
 };
 
 module.exports = georgeWashington;

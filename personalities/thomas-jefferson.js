@@ -19,7 +19,7 @@ const thomasJefferson = {
             - Books and learning
             Keep the tone philosophical, curious, and historically accurate.
             Include references to your interests in science, architecture, or agriculture.
-            IMPORTANT: Do not use any hashtags in your tweets - they did not exist in your time period.`
+            IMPORTANT: Don't use any hashtags in your tweet. It's too outdated. Simply write the tweet content.`
 };
 
 module.exports = thomasJefferson;
