@@ -87,54 +87,48 @@ class TweetOperations {
         }
     }
 
-    async generateTweet(maxAttempts = 3) {
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                let tweetContext = "";
-                if (this.recentTweets.length > 0) {
-                    tweetContext = "\n\nRecent tweets from your timeline:\n" +
-                        this.recentTweets.map(tweet =>
-                            `${tweet.nickname}: ${tweet.content}`
-                        ).join('\n') +
-                        "\n\nConsider these recent tweets and react to them in your response while staying in character.";
-                }
-
-                const systemPrompt = this.personality.prompt + tweetContext + 
-                    "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be rejected.";
-                const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
-
-                console.log('\nComplete prompt being sent to OpenAI:');
-                console.log('System message:', systemPrompt);
-                console.log('User message:', userPrompt);
-
-                const completion = await this.openai.chat.completions.create({
-                    model: "gpt-4o-mini",
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        { role: "user", content: userPrompt }
-                    ],
-                    max_tokens: 100,
-                    temperature: 0.8
-                });
-
-                const tweet = completion.choices[0].message.content;
-
-                if (tweet.length <= 280) {
-                    console.log(`${this.personality.name}: Generated valid tweet (${tweet.length} characters)`);
-                    return tweet;
-                }
-
-                console.log(`${this.personality.name}: Generated tweet exceeded character limit (${tweet.length}/280), attempt ${attempt}/${maxAttempts}`);
-
-                if (attempt === maxAttempts) {
-                    const truncatedTweet = tweet.slice(0, 277) + "...";
-                    console.log(`${this.personality.name}: Truncated tweet to fit character limit`);
-                    return truncatedTweet;
-                }
-            } catch (error) {
-                console.error(`Tweet generation failed for ${this.personality.name} (attempt ${attempt}/${maxAttempts}):`, error);
-                if (attempt === maxAttempts) throw error;
+    async generateTweet() {
+        try {
+            let tweetContext = "";
+            if (this.recentTweets.length > 0) {
+                tweetContext = "\n\nRecent tweets from your timeline:\n" +
+                    this.recentTweets.map(tweet =>
+                        `${tweet.nickname}: ${tweet.content}`
+                    ).join('\n') +
+                    "\n\nConsider these recent tweets and react to them in your response while staying in character.";
             }
+
+            const systemPrompt = this.personality.prompt + '\n' + this.personality.name + '\n' + this.personality.title + '\n' + this.personality.years + '\n' + this.personality.characteristics + '\n' + this.personality.trivia + '\n' + this.personality.guidelines + '\n' + tweetContext + 
+                "\nIMPORTANT: Don't use hashtags in your tweet. Simply write the tweet content." + "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
+            const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
+
+            console.log('\nComplete prompt being sent to OpenAI:');
+            console.log('System message:', systemPrompt);
+            console.log('User message:', userPrompt);
+
+            const completion = await this.openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                max_tokens: 100,
+                temperature: 0.8
+            });
+
+            let tweet = completion.choices[0].message.content;
+
+            if (tweet.length > 280) {
+                tweet = tweet.slice(0, 277) + "...";
+                console.log(`${this.personality.name}: Tweet exceeded limit, truncated to ${tweet.length} characters`);
+            } else {
+                console.log(`${this.personality.name}: Generated tweet (${tweet.length} characters)`);
+            }
+
+            return tweet;
+        } catch (error) {
+            console.error(`Tweet generation failed for ${this.personality.name}:`, error);
+            throw error;
         }
     }
 
