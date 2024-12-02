@@ -244,14 +244,20 @@ class TwitterBot {
         try {
             await this.delay(2000);
     
-            const composeSelector = 'a[data-testid="SideNav_NewTweet_Button"]';
-            await this.page.waitForSelector(composeSelector, { visible: true });
-            await this.page.click(composeSelector);
+            // Click compose tweet button to ensure modal appears
+            const composeSelector = '[data-testid="tweetButtonInline"],[data-testid="SideNav_NewTweet_Button"]';
+            const composeButton = await this.page.waitForSelector(composeSelector);
+            await composeButton.click();
             await this.delay(1500);
     
-            const textareaSelector = 'div[data-testid="tweetTextarea_0"]';
-            await this.page.waitForSelector(textareaSelector, { visible: true });
-            await this.page.click(textareaSelector);
+            // Verify we're in the compose modal by checking backdrop
+            const modalSelector = '[aria-modal="true"]';
+            await this.page.waitForSelector(modalSelector);
+    
+            // Type the tweet
+            const textareaSelector = '[data-testid="tweetTextarea_0"]';
+            const textarea = await this.page.waitForSelector(textareaSelector);
+            await textarea.click();
             await this.page.keyboard.type(tweet, { delay: 50 });
             await this.delay(1000);
     
