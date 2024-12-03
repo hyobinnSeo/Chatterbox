@@ -12,29 +12,14 @@ class TweetOperations {
         try {
             console.log(`${this.personality.name}: Reading tweets from Following tab...`);
     
-            const followingTabSelectors = [
-                'a[href="/home"][aria-label*="Following"]',
-                '[data-testid="AppTabBar_Home_Link"]',
-                '[aria-label="Timeline: Following"]',
-                '[role="tab"][aria-selected="false"]'
-            ];
-    
-            let followingTab = null;
-            for (const selector of followingTabSelectors) {
-                followingTab = await this.page.$(selector);
-                if (followingTab) {
-                    await followingTab.click();
-                    break;
-                }
-            }
-    
-            if (!followingTab) {
-                const followingTabByText = await this.page.$x("//span[contains(text(), 'Following')]");
-                if (followingTabByText.length > 0) {
-                    await followingTabByText[0].click();
-                } else {
-                    throw new Error('Could not find Following tab');
-                }
+            // Wait for and click the Following tab
+            await this.page.waitForSelector('[role="tab"]');
+            const followingTab = await this.page.$('a[href="/home"][role="tab"]:not([aria-selected="true"])');
+            if (followingTab) {
+                await followingTab.click();
+                console.log(`${this.personality.name}: Switched to Following tab`);
+            } else {
+                throw new Error('Could not find Following tab');
             }
     
             await Utilities.delay(3000);
