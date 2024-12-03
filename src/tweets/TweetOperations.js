@@ -77,7 +77,10 @@ class TweetOperations {
                     if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
                         const contentElement = tweet.querySelector('[data-testid="tweetText"]');
                         const replyButton = tweet.querySelector('[data-testid="reply"]');
-                        if (contentElement && replyButton) {
+                        const replyCount = tweet.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
+                        const hasReplies = replyCount && parseInt(replyCount.textContent) > 0;
+                        
+                        if (contentElement && replyButton && !hasReplies) {
                             return {
                                 content: contentElement.textContent,
                                 found: true
@@ -89,25 +92,29 @@ class TweetOperations {
             }, targetUsername);
     
             if (!targetTweet.found) {
-                console.log(`${this.personality.name}: No tweets found from @${targetUsername}`);
+                console.log(`${this.personality.name}: No unreplied tweets found from @${targetUsername}, skipping reply.`);
                 return;
             }
     
-            // Click the reply button
+            // Click the reply button for the selected tweet
             await this.page.evaluate((username) => {
                 const tweets = document.querySelectorAll('[data-testid="tweet"]');
                 for (const tweet of tweets) {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
                     if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
+                        const contentElement = tweet.querySelector('[data-testid="tweetText"]');
                         const replyButton = tweet.querySelector('[data-testid="reply"]');
-                        if (replyButton) {
+                        const replyCount = tweet.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
+                        const hasReplies = replyCount && parseInt(replyCount.textContent) > 0;
+                        
+                        if (contentElement && replyButton && !hasReplies) {
                             replyButton.click();
                             return true;
                         }
                     }
                 }
             }, targetUsername);
-    
+
             await Utilities.delay(2000);
     
             // Generate reply content
@@ -119,8 +126,8 @@ class TweetOperations {
                 this.personality.trivia + '\n' + 
                 this.personality.about_yuki + '\n' + 
                 this.personality.guidelines + '\n' + 
-                               `You are replying to this tweet: Yuki: ${targetTweet.content}\n` +
-                               "IMPORTANT: Keep your reply under 280 characters. Don't use @ mentions or hashtags.";
+                `You are replying to this tweet: Yuki: ${targetTweet.content}\n` +
+                "IMPORTANT: Keep your reply under 280 characters. Don't use @ mentions or hashtags.";
     
             const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Be concise and relevant.";
     
