@@ -1,5 +1,4 @@
 const puppeteer = require('puppeteer');
-const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
 
@@ -11,11 +10,6 @@ class TwitterBot {
         this.browser = null;
         this.page = null;
         this.recentTweets = [];
-
-        // Initialize OpenAI
-        this.openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY,
-        });
     }
 
     async createChromePrefs() {
@@ -296,27 +290,39 @@ class TwitterBot {
                 const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
 
                 // Print the complete prompt to console
-                console.log('\nComplete prompt being sent to OpenAI:');
+                console.log('\nComplete prompt being sent to OpenRouter:');
                 console.log('System message:', systemPrompt);
                 console.log('User message:', userPrompt);
 
-                const completion = await this.openai.chat.completions.create({
-                    model: "gpt-4o-mini",
-                    messages: [
-                        {
-                            role: "system",
-                            content: systemPrompt
-                        },
-                        {
-                            role: "user",
-                            content: userPrompt
-                        }
-                    ],
-                    max_tokens: 100,
-                    temperature: 0.8
+                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                        'HTTP-Referer': 'http://localhost:3000',
+                        'X-Title': 'Twitter Bot'
+                    },
+                    body: JSON.stringify({
+                        model: "google/gemini-pro-1.5",
+                        messages: [
+                            {
+                                role: "system",
+                                content: systemPrompt
+                            },
+                            {
+                                role: "user",
+                                content: userPrompt
+                            }
+                        ]
+                    })
                 });
 
-                const tweet = completion.choices[0].message.content;
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const tweet = data.choices[0].message.content;
 
                 // Check if tweet is within character limit
                 if (tweet.length <= 280) {
