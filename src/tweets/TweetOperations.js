@@ -287,21 +287,25 @@ class TweetOperations {
         try {
             console.log(`${this.personality.name}: Looking for tweets from @${targetUsername}...`);
     
-            // Find tweets from the specific user
-            const targetTweet = await this.page.evaluate((username) => {
+            // Find tweets from the specific user and get tweet URL
+            const targetTweetData = await this.page.evaluate((username) => {
                 const tweets = document.querySelectorAll('[data-testid="tweet"]');
                 for (const tweet of tweets) {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
                     if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
                         const contentElement = tweet.querySelector('[data-testid="tweetText"]');
-                        const replyButton = tweet.querySelector('[data-testid="reply"]');
                         const replyCount = tweet.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
                         const replyNumber = replyCount ? parseInt(replyCount.textContent) : 0;
                         const hasTooManyReplies = replyNumber >= 3;
     
-                        if (contentElement && replyButton && !hasTooManyReplies) {
+                        if (contentElement && !hasTooManyReplies) {
+                            // Get tweet URL from time element's parent link
+                            const timeLink = tweet.querySelector('time').parentElement;
+                            const tweetUrl = timeLink ? timeLink.getAttribute('href') : null;
+    
                             return {
                                 content: contentElement.textContent,
+                                tweetUrl,
                                 found: true
                             };
                         }
@@ -310,34 +314,61 @@ class TweetOperations {
                 return { found: false };
             }, targetUsername);
     
-            // Rest of the function remains the same
-            if (!targetTweet.found) {
+            if (!targetTweetData.found || !targetTweetData.tweetUrl) {
                 console.log(`${this.personality.name}: No suitable tweets found from @${targetUsername}, skipping reply.`);
                 return;
             }
     
-            // Click the reply button for the selected tweet
-            await this.page.evaluate((username) => {
+            // Navigate to the specific tweet
+            await this.page.evaluate(tweetUrl => {
+                window.location.href = tweetUrl;
+            }, targetTweetData.tweetUrl);
+    
+            await Utilities.delay(3000);
+    
+            // Get thread context
+            const threadContext = await this.page.evaluate(() => {
+                const tweets = [];
+                const tweetElements = Array.from(document.querySelectorAll('[data-testid="tweet"]'))
+                    .filter(tweet => !tweet.closest('[role="menuitem"]'));
+    
+                for (const tweet of tweetElements) {
+                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                    const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+    
+                    if (usernameElement && contentElement) {
+                        tweets.unshift({
+                            username: usernameElement.textContent,
+                            content: contentElement.textContent
+                        });
+    
+                        if (tweets.length >= 10) break;
+                    }
+                }
+                return tweets.reverse();
+            });
+    
+            // Find and click reply on the target tweet
+            await this.page.evaluate((targetContent) => {
                 const tweets = document.querySelectorAll('[data-testid="tweet"]');
                 for (const tweet of tweets) {
-                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
-                        const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                    const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                    if (contentElement && contentElement.textContent === targetContent) {
                         const replyButton = tweet.querySelector('[data-testid="reply"]');
-                        const replyCount = tweet.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
-                        const replyNumber = replyCount ? parseInt(replyCount.textContent) : 0;
-                        const hasTooManyReplies = replyNumber >= 3;
-    
-                        if (contentElement && replyButton && !hasTooManyReplies) {
+                        if (replyButton) {
                             replyButton.click();
-                            return true;
+                            return;
                         }
                     }
                 }
-            }, targetUsername);
+            }, targetTweetData.content);
     
-            // Rest of the function code continues unchanged...
             await Utilities.delay(2000);
+    
+            // Generate reply with thread context
+            const threadPrompt = threadContext.map(tweet =>
+                `${tweet.username}: ${tweet.content}`
+            ).join('\n');
     
             const systemPrompt = this.personality.reply_prompt + '\n' +
                 this.personality.name + '\n' +
@@ -347,10 +378,10 @@ class TweetOperations {
                 this.personality.trivia + '\n' +
                 this.personality.about_yuki + '\n' +
                 this.personality.guidelines + '\n' +
-                `You are replying to this tweet: Yuki: ${targetTweet.content}\n` +
+                `Thread context:\n${threadPrompt}\n` +
                 "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
     
-            const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Be concise and relevant.";
+            const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant.";
     
             console.log('\nComplete prompt being sent to OpenRouter:');
             console.log('System message:', systemPrompt);
@@ -399,7 +430,10 @@ class TweetOperations {
             await Utilities.delay(3000);
             console.log(`${this.personality.name} successfully replied to @${targetUsername}: ${reply}`);
     
+            await this.returnToHome();
+    
         } catch (error) {
+            await this.returnToHome();
             await this.errorHandler.handleError(error, 'Replying to tweet');
         }
     }
