@@ -11,7 +11,7 @@ class TweetOperations {
     async readFollowingTweets() {
         try {
             console.log(`${this.personality.name}: Reading tweets from Following tab...`);
-    
+
             // Wait for and click the Following tab
             await this.page.waitForSelector('[role="tab"]');
             const followingTab = await this.page.$('a[href="/home"][role="tab"]:not([aria-selected="true"])');
@@ -21,45 +21,45 @@ class TweetOperations {
             } else {
                 throw new Error('Could not find Following tab');
             }
-    
+
             await Utilities.delay(3000);
-    
+
             this.recentTweets = await this.page.evaluate(async () => {
                 const tweets = [];
                 let attempts = 0;
                 const maxAttempts = 5;
-                
+
                 while (tweets.length < 10 && attempts < maxAttempts) {
                     const tweetElements = document.querySelectorAll('[data-testid="tweet"]');
-                    
+
                     for (const tweet of tweetElements) {
                         const nicknameElement = tweet.querySelector('[data-testid="User-Name"]');
                         const contentElement = tweet.querySelector('[data-testid="tweetText"]');
-                        
+
                         if (nicknameElement && contentElement) {
                             const tweetData = {
                                 nickname: nicknameElement.textContent,
                                 content: contentElement.textContent
                             };
-                            
+
                             if (!tweets.some(t => t.nickname === tweetData.nickname && t.content === tweetData.content)) {
                                 tweets.push(tweetData);
                                 if (tweets.length >= 10) break;
                             }
                         }
                     }
-                    
+
                     if (tweets.length < 10) {
                         window.scrollBy(0, 500);
                         await new Promise(resolve => setTimeout(resolve, 1000));
                     }
-                    
+
                     attempts++;
                 }
-                
+
                 return tweets;
             });
-    
+
             console.log(`${this.personality.name}: Read ${this.recentTweets.length} tweets from timeline`);
         } catch (error) {
             await this.errorHandler.handleError(error, 'Reading tweets');
@@ -77,8 +77,8 @@ class TweetOperations {
                     "\n\nConsider these recent tweets and react to them in your response while staying in character.";
             }
 
-            const systemPrompt = this.personality.prompt + '\n' + this.personality.name + '\n' + this.personality.title + '\n' + this.personality.years + '\n' + this.personality.characteristics + '\n' + this.personality.trivia + '\n' + this.personality.guidelines + '\n' + tweetContext + 
-                "\nIMPORTANT: Don't use @ to tag anyone, and no hashtags in your tweet. Simply write the tweet content." + "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
+            const systemPrompt = this.personality.prompt + '\n' + this.personality.name + '\n' + this.personality.title + '\n' + this.personality.years + '\n' + this.personality.characteristics + '\n' + this.personality.trivia + '\n' + this.personality.guidelines + '\n' + tweetContext +
+                "\nIMPORTANT: If the timeline's subject matter is becoming repetitive (everyone is discussing the same thing), avoid that topic and talk about something else." + "\nIMPORTANT: Don't use @ to tag anyone, and no hashtags in your tweet. Simply write the tweet content." + "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
             const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
 
             console.log('\nComplete prompt being sent to OpenRouter:');
@@ -113,13 +113,26 @@ class TweetOperations {
                 throw new Error('No response content received from OpenRouter');
             }
 
-            // Clean up the tweet and ensure it's within limits
-            tweet = tweet.trim();
-            
-            // Remove any quotes that might have been added by the AI
-            if (tweet.startsWith('"') && tweet.endsWith('"')) {
-                tweet = tweet.slice(1, -1).trim();
+            function cleanupTweet(tweet) {
+                // Remove any quotes that might have been added by the AI
+                if (tweet.startsWith('"') && tweet.endsWith('"')) {
+                    tweet = tweet.slice(1, -1).trim();
+                }
+
+                // Remove hashtags
+                tweet = tweet.replace(/#\w+/g, '');
+
+                // Remove @ mentions
+                tweet = tweet.replace(/@\w+/g, '');
+
+                // Clean up any double spaces created by removals
+                tweet = tweet.replace(/\s+/g, ' ').trim();
+
+                return tweet;
             }
+
+            // Add this to the generateTweet method before returning the tweet:
+            tweet = cleanupTweet(tweet);
 
             // Enforce the 280 character limit
             const MAX_TWEET_LENGTH = 280;
