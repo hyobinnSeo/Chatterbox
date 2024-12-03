@@ -1,9 +1,13 @@
 require('dotenv').config();
+const express = require('express');
 const cron = require('node-cron');
 const TwitterBot = require('./src/TwitterBot');
 const georgeWashington = require('./personalities/george-washington');
 const johnAdams = require('./personalities/john-adams');
 const thomasJefferson = require('./personalities/thomas-jefferson');
+
+const app = express();
+const port = process.env.PORT || 8080;
 
 // Configure bot instances
 const bots = [
@@ -69,14 +73,24 @@ async function runAllBots() {
     }
 }
 
-// Schedule tweets using cron
-const tweetSchedule = process.env.TWEET_FREQUENCY || '0 * * * *';  // Default to every hour
-cron.schedule(tweetSchedule, runAllBots);
+// Add health check endpoint
+app.get('/', (req, res) => {
+    res.status(200).send('Chatterbox is running');
+});
 
-// Initial run
-console.log('Historical Twitter Bots initialized');
-console.log('Tweet schedule:', tweetSchedule);
-runAllBots();
+// Start the server
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+    
+    // Schedule tweets using cron
+    const tweetSchedule = process.env.TWEET_FREQUENCY || '0 * * * *';  // Default to every hour
+    cron.schedule(tweetSchedule, runAllBots);
+
+    // Initial run
+    console.log('Historical Twitter Bots initialized');
+    console.log('Tweet schedule:', tweetSchedule);
+    runAllBots();
+});
 
 // Handle process termination
 process.on('SIGINT', async () => {

@@ -1,0 +1,9 @@
+.git
+.gitignore
+node_modules/
+chrome-profile/
+.env
+*.md
+.gcloudignore
+.env.example
+errors/
