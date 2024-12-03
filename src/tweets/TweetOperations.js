@@ -121,18 +121,18 @@ class TweetOperations {
             await this.page.click(notificationSelector);
             await Utilities.delay(3000);
 
-            // Find tweets from the specific user in notifications
-            const targetTweet = await this.page.evaluate((username) => {
+            // Find and click the tweet content to navigate to the thread
+            const targetTweetData = await this.page.evaluate((username) => {
                 const notifications = document.querySelectorAll('[data-testid="tweet"]');
                 for (const notification of notifications) {
                     const usernameElement = notification.querySelector('[data-testid="User-Name"]');
                     if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
                         const contentElement = notification.querySelector('[data-testid="tweetText"]');
-                        const replyButton = notification.querySelector('[data-testid="reply"]');
+                        // Make sure we find a tweet that hasn't been replied to
                         const replyCount = notification.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
                         const hasReplies = replyCount && parseInt(replyCount.textContent) > 0;
                         
-                        if (contentElement && replyButton && !hasReplies) {
+                        if (contentElement && !hasReplies) {
                             return {
                                 content: contentElement.textContent,
                                 found: true
@@ -143,38 +143,70 @@ class TweetOperations {
                 return { found: false };
             }, targetUsername);
 
-            if (!targetTweet.found) {
+            if (!targetTweetData.found) {
                 console.log(`${this.personality.name}: No unreplied notifications found from @${targetUsername}, skipping reply.`);
-                // Return to home before exiting
-                const homeSelector = '[data-testid="AppTabBar_Home_Link"]';
-                await this.page.waitForSelector(homeSelector);
-                await this.page.click(homeSelector);
-                await Utilities.delay(2000);
+                await this.returnToHome();
                 return;
             }
 
-            // Click the reply button for the selected tweet
+            // Click the tweet content area to navigate to the thread
             await this.page.evaluate((username) => {
                 const notifications = document.querySelectorAll('[data-testid="tweet"]');
                 for (const notification of notifications) {
                     const usernameElement = notification.querySelector('[data-testid="User-Name"]');
                     if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
-                        const contentElement = notification.querySelector('[data-testid="tweetText"]');
-                        const replyButton = notification.querySelector('[data-testid="reply"]');
-                        const replyCount = notification.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
-                        const hasReplies = replyCount && parseInt(replyCount.textContent) > 0;
-                        
-                        if (contentElement && replyButton && !hasReplies) {
-                            replyButton.click();
-                            return true;
+                        // Find the tweet text area and get its parent article
+                        const tweetText = notification.querySelector('[data-testid="tweetText"]');
+                        if (tweetText) {
+                            // Find the closest article ancestor
+                            const article = tweetText.closest('article[data-testid="tweet"]');
+                            if (article) {
+                                // Find the time element which is typically the link to the individual tweet
+                                const timeLink = article.querySelector('time').parentElement;
+                                if (timeLink) {
+                                    timeLink.click();
+                                    return true;
+                                }
+                            }
                         }
                     }
                 }
             }, targetUsername);
 
+            await Utilities.delay(3000);
+
+            // Gather context from the thread (up to 10 tweets)
+            const threadContext = await this.page.evaluate(() => {
+                const tweets = [];
+                const tweetElements = Array.from(document.querySelectorAll('[data-testid="tweet"]'));
+                const mainTweets = tweetElements.filter(tweet => !tweet.closest('[role="menuitem"]')); // Exclude menu items
+                
+                for (const tweet of mainTweets) {
+                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                    const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                    
+                    if (usernameElement && contentElement) {
+                        tweets.unshift({ // Add to start of array instead of end
+                            username: usernameElement.textContent,
+                            content: contentElement.textContent
+                        });
+                        
+                        if (tweets.length >= 10) break;
+                    }
+                }
+                return tweets.reverse();
+            });
+
+            // Click reply on the target tweet page
+            await this.page.waitForSelector('[data-testid="reply"]');
+            await this.page.click('[data-testid="reply"]');
             await Utilities.delay(2000);
 
-            // Generate and post the reply using the same logic as replyToSpecificUser
+            // Generate reply with thread context
+            const threadPrompt = threadContext.map(tweet => 
+                `${tweet.username}: ${tweet.content}`
+            ).join('\n');
+
             const systemPrompt = this.personality.reply_prompt + '\n' + 
                 this.personality.name + '\n' + 
                 this.personality.title + '\n' + 
@@ -183,10 +215,10 @@ class TweetOperations {
                 this.personality.trivia + '\n' + 
                 this.personality.about_yuki + '\n' + 
                 this.personality.guidelines + '\n' + 
-                `You are replying to this tweet: Yuki: ${targetTweet.content}\n` +
+                `Thread context:\n${threadPrompt}\n` +
                 "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
 
-            const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Be concise and relevant.";
+            const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant.";
 
             console.log('\nComplete prompt being sent to OpenRouter:');
             console.log('System message:', systemPrompt);
@@ -220,7 +252,6 @@ class TweetOperations {
                 throw new Error('No response content received from OpenRouter');
             }
 
-            // Clean up the reply
             reply = this.cleanupTweet(reply);
 
             // Post the reply
@@ -235,26 +266,25 @@ class TweetOperations {
             await this.page.click(replyButtonSelector);
 
             await Utilities.delay(3000);
-            console.log(`${this.personality.name} successfully replied to @${targetUsername} notification: ${reply}`);
+            console.log(`${this.personality.name} successfully replied to @${targetUsername} with thread context: ${reply}`);
 
-            // Return to home before finishing
+            await this.returnToHome();
+
+        } catch (error) {
+            await this.returnToHome();
+            await this.errorHandler.handleError(error, 'Replying to notification');
+        }
+    }
+
+    // Helper method to return to home
+    async returnToHome() {
+        try {
             const homeSelector = '[data-testid="AppTabBar_Home_Link"]';
             await this.page.waitForSelector(homeSelector);
             await this.page.click(homeSelector);
             await Utilities.delay(2000);
-
-        } catch (error) {
-            // Make sure we return to home even if there's an error
-            try {
-                const homeSelector = '[data-testid="AppTabBar_Home_Link"]';
-                await this.page.waitForSelector(homeSelector);
-                await this.page.click(homeSelector);
-                await Utilities.delay(2000);
-            } catch (navError) {
-                console.error('Error returning to home after error:', navError);
-            }
-            
-            await this.errorHandler.handleError(error, 'Replying to notification');
+        } catch (navError) {
+            console.error('Error returning to home:', navError);
         }
     }
 
