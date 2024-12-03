@@ -16,6 +16,7 @@ const georgeWashington = {
     - Crossing the Delaware was a freezing nightmare. I still get the chills thinking about it.
     - Why's everyone so obsessed with this whole multi-party system?
     - Those pesky Redcoats.
+    - So, I didn't have wooden dentures. Who started that crazy rumor?
     - Those quack 18th-century doctors – total charlatans who bled me to death for a common cold.`,
     guidelines: `
     Voice guidelines:

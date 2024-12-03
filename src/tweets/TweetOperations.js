@@ -53,8 +53,8 @@ class TweetOperations {
                         
                         if (nicknameElement && contentElement) {
                             const tweetData = {
-                                nickname: nicknameElement.textContent.trim(),
-                                content: contentElement.textContent.trim()
+                                nickname: nicknameElement.textContent,
+                                content: contentElement.textContent
                             };
                             
                             if (!tweets.some(t => t.nickname === tweetData.nickname && t.content === tweetData.content)) {
@@ -109,7 +109,7 @@ class TweetOperations {
                     'X-Title': 'Chatterbox'
                 },
                 body: JSON.stringify({
-                    model: "anthropic/claude-3-haiku-20240307",
+                    model: "google/gemini-pro-1.5",
                     messages: [
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
@@ -128,9 +128,20 @@ class TweetOperations {
                 throw new Error('No response content received from OpenRouter');
             }
 
-            if (tweet.length > 280) {
-                tweet = tweet.slice(0, 277) + "...";
-                console.log(`${this.personality.name}: Tweet exceeded limit, truncated to ${tweet.length} characters`);
+            // Clean up the tweet and ensure it's within limits
+            tweet = tweet.trim();
+            
+            // Remove any quotes that might have been added by the AI
+            if (tweet.startsWith('"') && tweet.endsWith('"')) {
+                tweet = tweet.slice(1, -1).trim();
+            }
+
+            // Enforce the 280 character limit
+            const MAX_TWEET_LENGTH = 280;
+            if (tweet.length > MAX_TWEET_LENGTH) {
+                console.log(`${this.personality.name}: Original tweet exceeded ${MAX_TWEET_LENGTH} characters (${tweet.length})`);
+                tweet = tweet.slice(0, MAX_TWEET_LENGTH - 3) + "...";
+                console.log(`${this.personality.name}: Tweet truncated to ${tweet.length} characters`);
             } else {
                 console.log(`${this.personality.name}: Generated tweet (${tweet.length} characters)`);
             }
@@ -144,6 +155,12 @@ class TweetOperations {
 
     async postTweet(tweet) {
         try {
+            // Final length check before posting
+            if (tweet.length > 280) {
+                tweet = tweet.slice(0, 277) + "...";
+                console.log(`${this.personality.name}: Final tweet length check - truncated to ${tweet.length} characters`);
+            }
+
             await Utilities.delay(2000);
 
             const composeSelector = '[data-testid="tweetButtonInline"],[data-testid="SideNav_NewTweet_Button"]';
