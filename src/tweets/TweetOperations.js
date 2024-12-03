@@ -65,17 +65,16 @@ class TweetOperations {
             await this.errorHandler.handleError(error, 'Reading tweets');
         }
     }
-
-    async replyToSpecificUser() {
+    async replyToSpecificUser(targetUsername) {
         try {
-            console.log(`${this.personality.name}: Looking for tweets from @libertybelltail...`);
+            console.log(`${this.personality.name}: Looking for tweets from @${targetUsername}...`);
             
             // Find tweets from the specific user
-            const targetTweet = await this.page.evaluate(() => {
+            const targetTweet = await this.page.evaluate((username) => {
                 const tweets = document.querySelectorAll('[data-testid="tweet"]');
                 for (const tweet of tweets) {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    if (usernameElement && usernameElement.textContent.includes('@libertybelltail')) {
+                    if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
                         const contentElement = tweet.querySelector('[data-testid="tweetText"]');
                         const replyButton = tweet.querySelector('[data-testid="reply"]');
                         if (contentElement && replyButton) {
@@ -87,19 +86,19 @@ class TweetOperations {
                     }
                 }
                 return { found: false };
-            });
-
+            }, targetUsername);
+    
             if (!targetTweet.found) {
-                console.log(`${this.personality.name}: No tweets found from @libertybelltail`);
+                console.log(`${this.personality.name}: No tweets found from @${targetUsername}`);
                 return;
             }
-
+    
             // Click the reply button
-            await this.page.evaluate(() => {
+            await this.page.evaluate((username) => {
                 const tweets = document.querySelectorAll('[data-testid="tweet"]');
                 for (const tweet of tweets) {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    if (usernameElement && usernameElement.textContent.includes('@libertybelltail')) {
+                    if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
                         const replyButton = tweet.querySelector('[data-testid="reply"]');
                         if (replyButton) {
                             replyButton.click();
@@ -107,18 +106,28 @@ class TweetOperations {
                         }
                     }
                 }
-            });
-
+            }, targetUsername);
+    
             await Utilities.delay(2000);
-
+    
             // Generate reply content
-            const systemPrompt = this.personality.prompt + '\n' + 
-                               this.personality.characteristics + '\n' +
-                               `You are replying to this tweet: ${targetTweet.content}\n` +
+            const systemPrompt = this.personality.reply_prompt + '\n' + 
+                this.personality.name + '\n' + 
+                this.personality.title + '\n' + 
+                this.personality.years + '\n' + 
+                this.personality.characteristics + '\n' + 
+                this.personality.trivia + '\n' + 
+                this.personality.about_yuki + '\n' + 
+                this.personality.guidelines + '\n' + 
+                               `You are replying to this tweet: Yuki: ${targetTweet.content}\n` +
                                "IMPORTANT: Keep your reply under 280 characters. Don't use @ mentions or hashtags.";
-
+    
             const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Be concise and relevant.";
-
+    
+            console.log('\nComplete prompt being sent to OpenRouter:');
+            console.log('System message:', systemPrompt);
+            console.log('User message:', userPrompt);
+    
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -135,35 +144,35 @@ class TweetOperations {
                     ]
                 })
             });
-
+    
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-
+    
             const data = await response.json();
             let reply = data.choices[0]?.message?.content;
-
+    
             if (!reply) {
                 throw new Error('No response content received from OpenRouter');
             }
-
+    
             // Clean up the reply using the shared cleanup method
             reply = this.cleanupTweet(reply);
-
+    
             // Post the reply
             const textareaSelector = '[data-testid="tweetTextarea_0"]';
             const textarea = await this.page.waitForSelector(textareaSelector);
             await textarea.click();
             await this.page.keyboard.type(reply, { delay: 50 });
             await Utilities.delay(1000);
-
+    
             const replyButtonSelector = '[data-testid="tweetButton"]';
             await this.page.waitForSelector(replyButtonSelector);
             await this.page.click(replyButtonSelector);
-
+    
             await Utilities.delay(3000);
-            console.log(`${this.personality.name} successfully replied to @libertybelltail: ${reply}`);
-
+            console.log(`${this.personality.name} successfully replied to @${targetUsername}: ${reply}`);
+    
         } catch (error) {
             await this.errorHandler.handleError(error, 'Replying to tweet');
         }
