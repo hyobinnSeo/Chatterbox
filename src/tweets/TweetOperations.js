@@ -184,7 +184,7 @@ class TweetOperations {
                 this.personality.about_yuki + '\n' + 
                 this.personality.guidelines + '\n' + 
                 `You are replying to this tweet: Yuki: ${targetTweet.content}\n` +
-                "IMPORTANT: Keep your reply under 280 characters. Don't use @ mentions or hashtags.";
+                "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
 
             const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Be concise and relevant.";
 
@@ -320,7 +320,7 @@ class TweetOperations {
                 this.personality.about_yuki + '\n' + 
                 this.personality.guidelines + '\n' + 
                 `You are replying to this tweet: Yuki: ${targetTweet.content}\n` +
-                "IMPORTANT: Keep your reply under 280 characters. Don't use @ mentions or hashtags.";
+                "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
     
             const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Be concise and relevant.";
     
@@ -421,7 +421,7 @@ class TweetOperations {
                 this.personality.guidelines + '\n' + 
                 tweetContext +
                 "\nIMPORTANT: If the timeline's subject matter is becoming repetitive (everyone is discussing the same thing), avoid that topic and talk about something else." + 
-                "\nIMPORTANT: Don't use @ to tag anyone, and no hashtags in your tweet. Simply write the tweet content." + 
+                "\nIMPORTANT: Don't use @, hashtags, or emojis. Simply write the tweet content." + 
                 "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
 
             const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
