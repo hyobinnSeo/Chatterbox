@@ -1,4 +1,3 @@
-const OpenAI = require('openai');
 const Utilities = require('../utils/Utilities');
 
 class TweetOperations {
@@ -7,11 +6,6 @@ class TweetOperations {
         this.personality = personality;
         this.errorHandler = errorHandler;
         this.recentTweets = [];
-
-        // Initialize OpenAI
-        this.openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY,
-        });
     }
 
     async readFollowingTweets() {
@@ -102,21 +96,37 @@ class TweetOperations {
                 "\nIMPORTANT: Don't use hashtags in your tweet. Simply write the tweet content." + "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
             const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
 
-            console.log('\nComplete prompt being sent to OpenAI:');
+            console.log('\nComplete prompt being sent to OpenRouter:');
             console.log('System message:', systemPrompt);
             console.log('User message:', userPrompt);
 
-            const completion = await this.openai.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt }
-                ],
-                max_tokens: 100,
-                temperature: 0.8
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    'HTTP-Referer': 'https://chatterbox.local',
+                    'X-Title': 'Chatterbox'
+                },
+                body: JSON.stringify({
+                    model: "anthropic/claude-3-haiku-20240307",
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt }
+                    ]
+                })
             });
 
-            let tweet = completion.choices[0].message.content;
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            let tweet = data.choices[0]?.message?.content;
+
+            if (!tweet) {
+                throw new Error('No response content received from OpenRouter');
+            }
 
             if (tweet.length > 280) {
                 tweet = tweet.slice(0, 277) + "...";
