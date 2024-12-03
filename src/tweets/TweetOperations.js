@@ -93,7 +93,7 @@ class TweetOperations {
             }
 
             const systemPrompt = this.personality.prompt + '\n' + this.personality.name + '\n' + this.personality.title + '\n' + this.personality.years + '\n' + this.personality.characteristics + '\n' + this.personality.trivia + '\n' + this.personality.guidelines + '\n' + tweetContext + 
-                "\nIMPORTANT: Don't use hashtags in your tweet. Simply write the tweet content." + "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
+                "\nIMPORTANT: Don't use @ to tag anyone, and no hashtags in your tweet. Simply write the tweet content." + "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
             const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
 
             console.log('\nComplete prompt being sent to OpenRouter:');
