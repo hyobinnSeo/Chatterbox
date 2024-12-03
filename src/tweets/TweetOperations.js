@@ -66,6 +66,132 @@ class TweetOperations {
         }
     }
 
+    async replyToSpecificUser() {
+        try {
+            console.log(`${this.personality.name}: Looking for tweets from @libertybelltail...`);
+            
+            // Find tweets from the specific user
+            const targetTweet = await this.page.evaluate(() => {
+                const tweets = document.querySelectorAll('[data-testid="tweet"]');
+                for (const tweet of tweets) {
+                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                    if (usernameElement && usernameElement.textContent.includes('@libertybelltail')) {
+                        const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                        const replyButton = tweet.querySelector('[data-testid="reply"]');
+                        if (contentElement && replyButton) {
+                            return {
+                                content: contentElement.textContent,
+                                found: true
+                            };
+                        }
+                    }
+                }
+                return { found: false };
+            });
+
+            if (!targetTweet.found) {
+                console.log(`${this.personality.name}: No tweets found from @libertybelltail`);
+                return;
+            }
+
+            // Click the reply button
+            await this.page.evaluate(() => {
+                const tweets = document.querySelectorAll('[data-testid="tweet"]');
+                for (const tweet of tweets) {
+                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                    if (usernameElement && usernameElement.textContent.includes('@libertybelltail')) {
+                        const replyButton = tweet.querySelector('[data-testid="reply"]');
+                        if (replyButton) {
+                            replyButton.click();
+                            return true;
+                        }
+                    }
+                }
+            });
+
+            await Utilities.delay(2000);
+
+            // Generate reply content
+            const systemPrompt = this.personality.prompt + '\n' + 
+                               this.personality.characteristics + '\n' +
+                               `You are replying to this tweet: ${targetTweet.content}\n` +
+                               "IMPORTANT: Keep your reply under 280 characters. Don't use @ mentions or hashtags.";
+
+            const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Be concise and relevant.";
+
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    'HTTP-Referer': 'https://chatterbox.local',
+                    'X-Title': 'Chatterbox'
+                },
+                body: JSON.stringify({
+                    model: "google/gemini-pro-1.5",
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt }
+                    ]
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            let reply = data.choices[0]?.message?.content;
+
+            if (!reply) {
+                throw new Error('No response content received from OpenRouter');
+            }
+
+            // Clean up the reply using the shared cleanup method
+            reply = this.cleanupTweet(reply);
+
+            // Post the reply
+            const textareaSelector = '[data-testid="tweetTextarea_0"]';
+            const textarea = await this.page.waitForSelector(textareaSelector);
+            await textarea.click();
+            await this.page.keyboard.type(reply, { delay: 50 });
+            await Utilities.delay(1000);
+
+            const replyButtonSelector = '[data-testid="tweetButton"]';
+            await this.page.waitForSelector(replyButtonSelector);
+            await this.page.click(replyButtonSelector);
+
+            await Utilities.delay(3000);
+            console.log(`${this.personality.name} successfully replied to @libertybelltail: ${reply}`);
+
+        } catch (error) {
+            await this.errorHandler.handleError(error, 'Replying to tweet');
+        }
+    }
+
+    cleanupTweet(tweet) {
+        // Remove any quotes that might have been added by the AI
+        if (tweet.startsWith('"') && tweet.endsWith('"')) {
+            tweet = tweet.slice(1, -1).trim();
+        }
+
+        // Remove hashtags
+        tweet = tweet.replace(/#\w+/g, '');
+
+        // Remove @ mentions
+        tweet = tweet.replace(/@\w+/g, '');
+
+        // Clean up any double spaces created by removals
+        tweet = tweet.replace(/\s+/g, ' ').trim();
+
+        // Enforce character limit
+        if (tweet.length > 280) {
+            tweet = tweet.slice(0, 277) + "...";
+        }
+
+        return tweet;
+    }
+
     async generateTweet() {
         try {
             let tweetContext = "";
@@ -77,8 +203,18 @@ class TweetOperations {
                     "\n\nConsider these recent tweets and react to them in your response while staying in character.";
             }
 
-            const systemPrompt = this.personality.prompt + '\n' + this.personality.name + '\n' + this.personality.title + '\n' + this.personality.years + '\n' + this.personality.characteristics + '\n' + this.personality.trivia + '\n' + this.personality.guidelines + '\n' + tweetContext +
-                "\nIMPORTANT: If the timeline's subject matter is becoming repetitive (everyone is discussing the same thing), avoid that topic and talk about something else." + "\nIMPORTANT: Don't use @ to tag anyone, and no hashtags in your tweet. Simply write the tweet content." + "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
+            const systemPrompt = this.personality.prompt + '\n' + 
+                this.personality.name + '\n' + 
+                this.personality.title + '\n' + 
+                this.personality.years + '\n' + 
+                this.personality.characteristics + '\n' + 
+                this.personality.trivia + '\n' + 
+                this.personality.guidelines + '\n' + 
+                tweetContext +
+                "\nIMPORTANT: If the timeline's subject matter is becoming repetitive (everyone is discussing the same thing), avoid that topic and talk about something else." + 
+                "\nIMPORTANT: Don't use @ to tag anyone, and no hashtags in your tweet. Simply write the tweet content." + 
+                "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
+
             const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
 
             console.log('\nComplete prompt being sent to OpenRouter:');
@@ -113,32 +249,12 @@ class TweetOperations {
                 throw new Error('No response content received from OpenRouter');
             }
 
-            function cleanupTweet(tweet) {
-                // Remove any quotes that might have been added by the AI
-                if (tweet.startsWith('"') && tweet.endsWith('"')) {
-                    tweet = tweet.slice(1, -1).trim();
-                }
+            // Use the shared cleanup method
+            tweet = this.cleanupTweet(tweet);
 
-                // Remove hashtags
-                tweet = tweet.replace(/#\w+/g, '');
-
-                // Remove @ mentions
-                tweet = tweet.replace(/@\w+/g, '');
-
-                // Clean up any double spaces created by removals
-                tweet = tweet.replace(/\s+/g, ' ').trim();
-
-                return tweet;
-            }
-
-            // Add this to the generateTweet method before returning the tweet:
-            tweet = cleanupTweet(tweet);
-
-            // Enforce the 280 character limit
-            const MAX_TWEET_LENGTH = 280;
-            if (tweet.length > MAX_TWEET_LENGTH) {
-                console.log(`${this.personality.name}: Original tweet exceeded ${MAX_TWEET_LENGTH} characters (${tweet.length})`);
-                tweet = tweet.slice(0, MAX_TWEET_LENGTH - 3) + "...";
+            // Log the tweet length info
+            if (tweet.length > 280) {
+                console.log(`${this.personality.name}: Original tweet exceeded 280 characters (${tweet.length})`);
                 console.log(`${this.personality.name}: Tweet truncated to ${tweet.length} characters`);
             } else {
                 console.log(`${this.personality.name}: Generated tweet (${tweet.length} characters)`);
@@ -153,11 +269,8 @@ class TweetOperations {
 
     async postTweet(tweet) {
         try {
-            // Final length check before posting
-            if (tweet.length > 280) {
-                tweet = tweet.slice(0, 277) + "...";
-                console.log(`${this.personality.name}: Final tweet length check - truncated to ${tweet.length} characters`);
-            }
+            // Use shared cleanup method for final length check
+            tweet = this.cleanupTweet(tweet);
 
             await Utilities.delay(2000);
 
