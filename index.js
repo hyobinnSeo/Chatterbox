@@ -30,12 +30,26 @@ const bots = [
     }
 ];
 
+// Fisher-Yates shuffle algorithm
+function shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
 // Function to run all bots
 async function runAllBots() {
     console.log('Starting tweet cycle...');
     
     try {
-        for (const bot of bots) {
+        // Create a shuffled copy of the bots array
+        const shuffledBots = shuffleArray(bots);
+        console.log('Bot order for this cycle:', shuffledBots.map(bot => bot.personality.name).join(', '));
+        
+        for (const bot of shuffledBots) {
             try {
                 const twitterBot = new TwitterBot(bot.credentials, bot.personality);
                 await twitterBot.run();
