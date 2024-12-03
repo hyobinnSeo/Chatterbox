@@ -25,6 +25,7 @@ class TwitterBot {
 
             // Execute workflow
             await auth.login();
+            await tweetOps.replyToUserFromNotifications('libertybelltail');
             await tweetOps.readFollowingTweets();
             await tweetOps.replyToSpecificUser('libertybelltail');
             const tweet = await tweetOps.generateTweet();
