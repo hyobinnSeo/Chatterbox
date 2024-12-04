@@ -1,6 +1,7 @@
 const BrowserManager = require('./browser/BrowserManager');
 const Authentication = require('./auth/Authentication');
 const TweetOperations = require('./tweets/TweetOperations');
+const ReplyOperations = require('./tweets/ReplyOperations');
 const ErrorHandler = require('./utils/ErrorHandler');
 const path = require('path');
 
@@ -22,12 +23,13 @@ class TwitterBot {
             // Initialize components
             const auth = new Authentication(page, this.credentials, this.personality, errorHandler);
             const tweetOps = new TweetOperations(page, this.personality, errorHandler);
+            const replyOps = new ReplyOperations(page, this.personality, errorHandler);
 
             // Execute workflow
             await auth.login();
-            await tweetOps.replyToUserFromNotifications('libertybelltail');
+            await replyOps.replyToUserFromNotifications('libertybelltail');
             await tweetOps.readFollowingTweets();
-            await tweetOps.replyToSpecificUser('libertybelltail');
+            await replyOps.replyToSpecificUser('libertybelltail');
             const tweet = await tweetOps.generateTweet();
             await tweetOps.postTweet(tweet);
             await auth.logout();
