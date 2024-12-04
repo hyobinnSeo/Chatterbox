@@ -163,22 +163,41 @@ class TweetOperations {
             // Get thread context
             const threadContext = await this.page.evaluate(() => {
                 const tweets = [];
-                const tweetElements = Array.from(document.querySelectorAll('[data-testid="tweet"]'))
-                    .filter(tweet => !tweet.closest('[role="menuitem"]'));
+                
+                // Get all thread containers
+                const threadContainers = Array.from(document.querySelectorAll('[data-testid="cellInnerDiv"]'));
+                
+                // Find the "Discover more" container index
+                const discoverMoreIndex = threadContainers.findIndex(div => 
+                    div.textContent.includes('Discover more')
+                );
+                
+                // Only process containers before the "Discover more" section
+                const relevantContainers = discoverMoreIndex !== -1 
+                    ? threadContainers.slice(0, discoverMoreIndex)
+                    : threadContainers;
 
-                for (const tweet of tweetElements) {
-                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                // Process all relevant containers
+                for (const container of relevantContainers) {
+                    const tweetElements = container.querySelectorAll('[data-testid="tweet"]');
+                    
+                    for (const tweet of tweetElements) {
+                        const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                        const contentElement = tweet.querySelector('[data-testid="tweetText"]');
 
-                    if (usernameElement && contentElement) {
-                        tweets.unshift({
-                            username: usernameElement.textContent,
-                            content: contentElement.textContent
-                        });
+                        if (usernameElement && contentElement) {
+                            tweets.unshift({
+                                username: usernameElement.textContent,
+                                content: contentElement.textContent
+                            });
 
-                        if (tweets.length >= 10) break;
+                            if (tweets.length >= 10) break;
+                        }
                     }
+                    
+                    if (tweets.length >= 10) break;
                 }
+                
                 return tweets.reverse();
             });
 
@@ -329,22 +348,41 @@ class TweetOperations {
             // Get thread context
             const threadContext = await this.page.evaluate(() => {
                 const tweets = [];
-                const tweetElements = Array.from(document.querySelectorAll('[data-testid="tweet"]'))
-                    .filter(tweet => !tweet.closest('[role="menuitem"]'));
-    
-                for (const tweet of tweetElements) {
-                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    const contentElement = tweet.querySelector('[data-testid="tweetText"]');
-    
-                    if (usernameElement && contentElement) {
-                        tweets.unshift({
-                            username: usernameElement.textContent,
-                            content: contentElement.textContent
-                        });
-    
-                        if (tweets.length >= 10) break;
+                
+                // Get all thread containers
+                const threadContainers = Array.from(document.querySelectorAll('[data-testid="cellInnerDiv"]'));
+                
+                // Find the "Discover more" container index
+                const discoverMoreIndex = threadContainers.findIndex(div => 
+                    div.textContent.includes('Discover more')
+                );
+                
+                // Only process containers before the "Discover more" section
+                const relevantContainers = discoverMoreIndex !== -1 
+                    ? threadContainers.slice(0, discoverMoreIndex)
+                    : threadContainers;
+
+                // Process all relevant containers
+                for (const container of relevantContainers) {
+                    const tweetElements = container.querySelectorAll('[data-testid="tweet"]');
+                    
+                    for (const tweet of tweetElements) {
+                        const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                        const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+
+                        if (usernameElement && contentElement) {
+                            tweets.unshift({
+                                username: usernameElement.textContent,
+                                content: contentElement.textContent
+                            });
+
+                            if (tweets.length >= 10) break;
+                        }
                     }
+                    
+                    if (tweets.length >= 10) break;
                 }
+                
                 return tweets.reverse();
             });
     
