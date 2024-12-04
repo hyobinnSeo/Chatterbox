@@ -235,7 +235,7 @@ class TweetOperations {
                         this.personality.years + '\n' +
                         this.personality.characteristics + '\n' +
                         this.personality.trivia + '\n' +
-                        this.personality.about_yuki + '\n' +
+                        this.personality.about_bell + '\n' +
                         this.personality.guidelines + '\n' +
                         `Thread context:\n${threadPrompt}\n` +
                         "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
@@ -432,7 +432,7 @@ class TweetOperations {
                 this.personality.years + '\n' +
                 this.personality.characteristics + '\n' +
                 this.personality.trivia + '\n' +
-                this.personality.about_yuki + '\n' +
+                this.personality.about_bell + '\n' +
                 this.personality.guidelines + '\n' +
                 `Thread context:\n${threadPrompt}\n` +
                 "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
