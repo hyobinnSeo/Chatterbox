@@ -85,9 +85,11 @@ class ReplyOperations {
         try {
             console.log(`${this.personality.name}: Looking for tweets from @${targetUsername}...`);
     
-            // Find tweets from the specific user and get tweet URL
-            const targetTweetData = await this.page.evaluate((username) => {
+            // Find all suitable tweets from the specific user
+            const targetTweetsData = await this.page.evaluate((username) => {
                 const tweets = document.querySelectorAll('[data-testid="tweet"]');
+                const suitableTweets = [];
+                
                 for (const tweet of tweets) {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
                     if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
@@ -100,28 +102,72 @@ class ReplyOperations {
                             const timeLink = tweet.querySelector('time').parentElement;
                             const tweetUrl = timeLink ? timeLink.getAttribute('href') : null;
     
-                            return {
-                                content: contentElement.textContent,
-                                tweetUrl,
-                                found: true
-                            };
+                            if (tweetUrl) {
+                                suitableTweets.push({
+                                    content: contentElement.textContent,
+                                    tweetUrl,
+                                });
+                            }
                         }
                     }
                 }
-                return { found: false };
+                return suitableTweets;
             }, targetUsername);
     
-            if (!targetTweetData.found || !targetTweetData.tweetUrl) {
+            if (targetTweetsData.length === 0) {
                 console.log(`${this.personality.name}: No suitable tweets found from @${targetUsername}, skipping reply.`);
                 return;
             }
     
-            await this.processAndReplyToTweet(targetTweetData, targetUsername);
+            // Try each tweet until we find one we haven't replied to
+            for (const tweetData of targetTweetsData) {
+                const hasReplied = await this.checkIfAlreadyReplied(tweetData);
+                if (!hasReplied) {
+                    await this.processAndReplyToTweet(tweetData, targetUsername);
+                    break;
+                } else {
+                    console.log(`${this.personality.name}: Already replied to tweet, skipping...`);
+                }
+            }
+            
             await this.returnToHome();
     
         } catch (error) {
             await this.returnToHome();
             await this.errorHandler.handleError(error, 'Replying to tweet');
+        }
+    }
+
+    async checkIfAlreadyReplied(tweetData) {
+        try {
+            // Navigate to the specific tweet
+            await this.page.evaluate(tweetUrl => {
+                window.location.href = tweetUrl;
+            }, tweetData.tweetUrl);
+
+            await Utilities.delay(3000);
+
+            // Extract bot's name from personality (removes "Name: " prefix)
+            const botName = this.personality.name.replace('Name: ', '');
+
+            // Check for bot's presence in the thread
+            const hasReply = await this.page.evaluate((botName) => {
+                const allTweets = document.querySelectorAll('[data-testid="tweet"]');
+                for (const tweet of allTweets) {
+                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                    if (usernameElement && usernameElement.textContent.includes(botName)) {
+                        return true;
+                    }
+                }
+                return false;
+            }, botName);
+
+            console.log(`${this.personality.name}: Checking for existing reply - ${hasReply ? 'Found reply' : 'No reply found'}`);
+            return hasReply;
+
+        } catch (error) {
+            console.error('Error checking for existing reply:', error);
+            return true; // Err on the side of caution - assume we've replied if there's an error
         }
     }
 

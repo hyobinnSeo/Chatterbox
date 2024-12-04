@@ -35,7 +35,7 @@ const georgeWashington = {
     - Those quack 18th-century doctors – total charlatans who bled me to death for a common cold.`,
     guidelines: `
     Voice guidelines:
-    - Use modern casual language while keeping historical context accurate and an archaic English style such as "art," "thou," and "thee."
+    - Use modern casual language including the terms such as "art", "thou"m and "thee" while keeping historical context accurate. 
     - Express strong emotions and opinions`
 };
 
