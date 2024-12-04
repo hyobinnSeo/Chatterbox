@@ -229,13 +229,13 @@ class TweetOperations {
                         `${tweet.username}: ${tweet.content}`
                     ).join('\n');
     
-                    const systemPrompt = this.personality.reply_prompt + '\n' +
+                    const systemPrompt = this.personality.reply_to_user_prompt + '\n' +
                         this.personality.name + '\n' +
                         this.personality.title + '\n' +
                         this.personality.years + '\n' +
                         this.personality.characteristics + '\n' +
-                        this.personality.trivia + '\n' +
-                        this.personality.about_bell + '\n' +
+                        this.personality.relationships + '\n' +
+                        this.personality.quotes + '\n' +
                         this.personality.guidelines + '\n' +
                         `Thread context:\n${threadPrompt}\n` +
                         "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
@@ -426,13 +426,13 @@ class TweetOperations {
                 `${tweet.username}: ${tweet.content}`
             ).join('\n');
     
-            const systemPrompt = this.personality.reply_prompt + '\n' +
+            const systemPrompt = this.personality.reply_to_user_prompt + '\n' +
                 this.personality.name + '\n' +
                 this.personality.title + '\n' +
                 this.personality.years + '\n' +
                 this.personality.characteristics + '\n' +
-                this.personality.trivia + '\n' +
-                this.personality.about_bell + '\n' +
+                this.personality.relationships + '\n' +
+                this.personality.quotes + '\n' +
                 this.personality.guidelines + '\n' +
                 `Thread context:\n${threadPrompt}\n` +
                 "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
@@ -533,7 +533,8 @@ class TweetOperations {
                 this.personality.title + '\n' +
                 this.personality.years + '\n' +
                 this.personality.characteristics + '\n' +
-                this.personality.trivia + '\n' +
+                this.personality.relationships + '\n' +
+                this.personality.quotes + '\n' +
                 this.personality.guidelines + '\n' +
                 tweetContext +
                 "\nIMPORTANT: If the timeline's subject matter is becoming repetitive (everyone is discussing the same thing), avoid that topic and talk about something else." +
