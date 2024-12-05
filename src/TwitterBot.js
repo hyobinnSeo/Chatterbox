@@ -30,6 +30,7 @@ class TwitterBot {
             // Execute workflow
             await auth.login();
             await replyOps.replyToSpecificUserFromNotifications(this.targetUser);
+            await replyOps.replyToBotNotifications();
             await tweetOps.readFollowingTweets();
             await replyOps.replyToSpecificUser(this.targetUser);
             await replyOps.replyToBotTweets();

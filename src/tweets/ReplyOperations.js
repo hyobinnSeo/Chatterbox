@@ -247,6 +247,95 @@ class ReplyOperations {
         }
     }
 
+    async replyToBotNotifications() {
+        try {
+            console.log(`${this.personality.name}: Checking notifications for bot replies...`);
+            
+            // Navigate to notifications
+            const notificationSelector = '[data-testid="AppTabBar_Notifications_Link"]';
+            await this.page.waitForSelector(notificationSelector);
+            await this.page.click(notificationSelector);
+            await Utilities.delay(3000);
+    
+            // Filter out current bot's username
+            const otherBotUsernames = this.allBotUsernames.filter(username => username !== this.currentUsername);
+    
+            // Find all unreplied bot notifications
+            const botNotifications = await this.page.evaluate(async (otherBotUsernames) => {
+                const notifications = document.querySelectorAll('[data-testid="tweet"]');
+                const botTweets = [];
+    
+                for (const notification of notifications) {
+                    const usernameElement = notification.querySelector('[data-testid="User-Name"]');
+                    if (usernameElement && otherBotUsernames.some(botUsername => 
+                        usernameElement.textContent.includes(botUsername))) {
+                        
+                        const contentElement = notification.querySelector('[data-testid="tweetText"]');
+                        const replyCount = notification.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
+                        const hasReplies = replyCount && parseInt(replyCount.textContent) > 0;
+    
+                        if (contentElement && !hasReplies) {
+                            const timeLink = notification.querySelector('time').parentElement;
+                            const tweetUrl = timeLink ? timeLink.getAttribute('href') : null;
+    
+                            if (tweetUrl) {
+                                botTweets.push({
+                                    username: usernameElement.textContent,
+                                    content: contentElement.textContent,
+                                    tweetUrl
+                                });
+                            }
+                        }
+                    }
+                }
+                return botTweets;
+            }, otherBotUsernames);
+    
+            console.log(`${this.personality.name}: Found ${botNotifications.length} unreplied bot notifications`);
+    
+            // Process each bot notification
+            for (const notification of botNotifications) {
+                // Check thread depth before replying
+                const threadDepth = await this.getThreadDepth(notification.tweetUrl);
+                
+                if (threadDepth >= 3) {
+                    console.log(`${this.personality.name}: Thread depth (${threadDepth}) exceeds limit, skipping...`);
+                    continue;
+                }
+    
+                await this.processAndReplyToTweet(notification, notification.username);
+                break; // Only reply to one notification per run to avoid spamming
+            }
+    
+            await this.returnToHome();
+    
+        } catch (error) {
+            await this.returnToHome();
+            await this.errorHandler.handleError(error, 'Replying to bot notifications');
+        }
+    }
+
+    async getThreadDepth(tweetUrl) {
+        try {
+            // Navigate to the tweet
+            await this.page.evaluate(url => {
+                window.location.href = url;
+            }, tweetUrl);
+            await Utilities.delay(3000);
+
+            // Count the number of replies in the thread
+            const depth = await this.page.evaluate(() => {
+                const tweets = document.querySelectorAll('[data-testid="tweet"]');
+                return tweets.length;
+            });
+
+            return depth;
+        } catch (error) {
+            console.error('Error getting thread depth:', error);
+            return 999; // Return a high number to skip the thread on error
+        }
+    }
+
     async replyToSpecificUser(targetUsername) {
         try {
             console.log(`${this.personality.name}: Looking for tweets from @${targetUsername}...`);
