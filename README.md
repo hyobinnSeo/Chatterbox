@@ -1,23 +1,27 @@
 # Historical Twitter Bots
 
-This project creates Twitter bots for five prominent American historical figures: George Washington, John Adams, Thomas Jefferson, Abraham Lincoln, and George McClellan. The bots use OpenAI's GPT model to generate historically accurate tweets about their daily lives and thoughts, posting regularly.
+This project creates Twitter bots for five prominent American historical figures: George Washington, John Adams, Thomas Jefferson, Abraham Lincoln, and George McClellan. The bots use Google's Gemini Pro 1.5 model through OpenRouter to generate historically accurate tweets and engage in meaningful conversations.
 
 ## Features
 
-- Automated Twitter interaction using Puppeteer for browser automation
-- Historically accurate content generation using OpenAI GPT
+- Sophisticated Twitter automation using Puppeteer
+- Historically accurate content generation using Gemini Pro 1.5
+- Complex interaction patterns:
+  - Timeline monitoring and responses
+  - Direct user engagement through notifications
+  - Bot-to-bot conversations with thread depth management
+  - Duplicate reply prevention
 - Distinct personalities for each historical figure
-- Tweet and reply functionality
-- Sophisticated error handling and logging
+- Robust error handling and recovery
 - Browser session management
-- Authentication handling
-- Utility functions for common operations
+- Clean content processing (removes hashtags, mentions, etc.)
 
 ## Prerequisites
 
 - Node.js (v14 or higher)
 - Twitter accounts for each historical figure
-- OpenAI API key
+- OpenRouter API key
+- Chrome/Chromium browser
 
 ## Installation
 
@@ -30,10 +34,7 @@ This project creates Twitter bots for five prominent American historical figures
    ```bash
    cp .env.example .env
    ```
-4. Configure your `.env` file with:
-   - Twitter credentials for each account
-   - OpenAI API key
-   - Other configuration settings
+4. Configure your `.env` file with the required credentials
 
 ## Environment Variables
 
@@ -50,8 +51,11 @@ TWITTER_PASSWORD_ABRAHAM_LINCOLN=your_lincoln_password
 TWITTER_USERNAME_GEORGE_MCCLELLAN=your_mcclellan_username
 TWITTER_PASSWORD_GEORGE_MCCLELLAN=your_mcclellan_password
 
-# OpenAI API Key
-OPENAI_API_KEY=your_openai_api_key
+# OpenRouter API Key
+OPENROUTER_API_KEY=your_openrouter_api_key
+
+# Target User for Interactions (optional)
+TARGET_USER=username_to_interact_with
 ```
 
 ## Project Structure
@@ -59,39 +63,55 @@ OPENAI_API_KEY=your_openai_api_key
 ```
 ├── src/
 │   ├── auth/
-│   │   └── Authentication.js
+│   │   └── Authentication.js      # Handles Twitter authentication
 │   ├── browser/
-│   │   └── BrowserManager.js
+│   │   └── BrowserManager.js      # Manages Puppeteer browser sessions
 │   ├── tweets/
-│   │   ├── TweetOperations.js
-│   │   └── ReplyOperations.js
+│   │   ├── TweetOperations.js     # Handles tweet creation and posting
+│   │   └── ReplyOperations.js     # Manages reply functionality
 │   ├── utils/
-│   │   ├── ErrorHandler.js
-│   │   └── Utilities.js
-│   └── TwitterBot.js
-├── personalities/
+│   │   ├── ErrorHandler.js        # Error handling and recovery
+│   │   └── Utilities.js           # Common utility functions
+│   └── TwitterBot.js              # Core bot implementation
+├── personalities/                  # Historical figure configurations
 │   ├── george-washington.js
 │   ├── john-adams.js
 │   ├── thomas-jefferson.js
 │   ├── abraham-lincoln.js
 │   └── george-mcclellan.js
-├── errors/
-├── chrome-profile/
-├── index.js
-├── .env
-└── README.md
+├── errors/                        # Error logs directory
+├── chrome-profile/               # Browser session data
+└── index.js                      # Application entry point
 ```
 
-## Core Components
+## Bot Workflow
 
-- **TwitterBot.js**: Main bot implementation handling core functionality
-- **Authentication.js**: Manages Twitter login and session handling
-- **BrowserManager.js**: Controls browser automation with Puppeteer
-- **TweetOperations.js**: Handles tweet creation and posting
-- **ReplyOperations.js**: Manages reply functionality
-- **ErrorHandler.js**: Provides robust error handling and logging
-- **Utilities.js**: Common utility functions
-- **Personality Files**: Individual configuration and prompts for each historical figure
+Each bot follows a sophisticated workflow:
+
+1. **Authentication**
+   - Secure login to Twitter account
+   - Session management
+
+2. **Timeline Monitoring**
+   - Reads and analyzes tweets from Following tab
+   - Processes tweet context for relevant responses
+
+3. **Interaction Patterns**
+   - Replies to notifications from specific users
+   - Engages with other historical bots
+   - Maintains conversation threads
+   - Prevents duplicate replies
+
+4. **Content Generation**
+   - Uses Gemini Pro 1.5 for historically accurate responses
+   - Considers conversation context
+   - Maintains character authenticity
+   - Enforces Twitter's character limits
+
+5. **Content Processing**
+   - Removes hashtags and mentions
+   - Enforces character limits
+   - Cleans up formatting
 
 ## Running the Bots
 
@@ -103,24 +123,28 @@ node index.js
 The bots will:
 1. Initialize browser sessions
 2. Authenticate with Twitter
-3. Generate historically accurate content using GPT
-4. Post tweets and interact with other users
-5. Handle errors and maintain logs
+3. Process notifications and timeline
+4. Generate and post content
+5. Engage in conversations
+6. Handle errors and maintain logs
 
 ## Personality Customization
 
-Each historical figure's personality is defined in their respective file under the `personalities/` directory. You can modify:
+Each historical figure's personality is defined in their respective file under `personalities/`. You can customize:
 - Character traits and mannerisms
 - Writing style and tone
-- Topics of interest and expertise
-- GPT prompt engineering parameters
+- Topics of interest
+- Response patterns for different scenarios
+- Interaction guidelines
 
 ## Safety Features
 
-- Sophisticated error handling and recovery
-- Browser session management
-- Detailed logging system
-- Graceful shutdown handling
+- Thread depth management to prevent infinite conversations
+- Duplicate reply prevention
+- Rate limiting through natural delays
+- Error recovery mechanisms
+- Session management
+- Content cleaning and validation
 
 ## Note
 
