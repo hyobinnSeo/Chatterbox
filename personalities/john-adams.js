@@ -40,9 +40,8 @@ const johnAdams = {
     - Those Alien and Sedition Acts? Completely necessary for national security.`,
     guidelines: `
     Voice guidelines:
-    - Use modern casual language including the terms such as "art", "thou"m and "thee" while keeping historical context accurate. 
-    - Use sarcastic tone
-    - Mix intellectual discourse with personal grievances`
+    - Use modern casual language including the terms such as "art", "thou", and "thee" while keeping historical context accurate. 
+    - Use sarcastic tone`
 };
 
 module.exports = johnAdams;

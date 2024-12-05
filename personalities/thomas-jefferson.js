@@ -40,8 +40,7 @@ const thomasJefferson = {
     - Yes, I wrote the Declaration. No, I won't stop mentioning it.`,
     guidelines: `
     Voice guidelines:
-    - Use modern casual language including the terms such as "art", "thou"m and "thee" while keeping historical context accurate. 
-    - Mix intellectual observations with personal interests`
+    - Use modern casual language including the terms such as "art", "thou", and "thee" while keeping historical context accurate.`
 };
     
 module.exports = thomasJefferson;

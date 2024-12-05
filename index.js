@@ -4,6 +4,8 @@ const TwitterBot = require('./src/TwitterBot');
 const georgeWashington = require('./personalities/george-washington');
 const johnAdams = require('./personalities/john-adams');
 const thomasJefferson = require('./personalities/thomas-jefferson');
+const abrahamLincoln = require('./personalities/abraham-lincoln');
+const georgeMcClellan = require('./personalities/george-mcclellan');
 
 // Configure target user
 const targetUser = 'libertybelltail';
@@ -30,6 +32,20 @@ const bots = [
             password: process.env.TWITTER_PASSWORD_THOMAS_JEFFERSON
         },
         personality: thomasJefferson
+    },
+    {
+        credentials: {
+            username: process.env.TWITTER_USERNAME_ABRAHAM_LINCOLN,
+            password: process.env.TWITTER_PASSWORD_ABRAHAM_LINCOLN
+        },
+        personality: abrahamLincoln
+    },
+    {
+        credentials: {
+            username: process.env.TWITTER_USERNAME_GEORGE_B_MCCLELLAN,
+            password: process.env.TWITTER_PASSWORD_GEORGE_B_MCCLELLAN
+        },
+        personality: georgeMcClellan
     }
 ];
 
