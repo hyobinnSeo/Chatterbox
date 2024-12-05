@@ -1,14 +1,17 @@
 # Historical Twitter Bots
 
-This project creates Twitter bots for three American Founding Fathers: George Washington, John Adams, and Thomas Jefferson. The bots use OpenAI's GPT model to generate historically accurate tweets about their daily lives and thoughts, posting every hour.
+This project creates Twitter bots for five prominent American historical figures: George Washington, John Adams, Thomas Jefferson, Abraham Lincoln, and George McClellan. The bots use OpenAI's GPT model to generate historically accurate tweets about their daily lives and thoughts, posting regularly.
 
 ## Features
 
-- Automated Twitter posting using Puppeteer
+- Automated Twitter interaction using Puppeteer for browser automation
 - Historically accurate content generation using OpenAI GPT
 - Distinct personalities for each historical figure
-- Scheduled tweets using node-cron
-- Random delays between posts to avoid detection
+- Tweet and reply functionality
+- Sophisticated error handling and logging
+- Browser session management
+- Authentication handling
+- Utility functions for common operations
 
 ## Prerequisites
 
@@ -30,7 +33,7 @@ This project creates Twitter bots for three American Founding Fathers: George Wa
 4. Configure your `.env` file with:
    - Twitter credentials for each account
    - OpenAI API key
-   - Desired tweet frequency (default: hourly)
+   - Other configuration settings
 
 ## Environment Variables
 
@@ -42,26 +45,53 @@ TWITTER_USERNAME_JOHN_ADAMS=your_adams_username
 TWITTER_PASSWORD_JOHN_ADAMS=your_adams_password
 TWITTER_USERNAME_THOMAS_JEFFERSON=your_jefferson_username
 TWITTER_PASSWORD_THOMAS_JEFFERSON=your_jefferson_password
+TWITTER_USERNAME_ABRAHAM_LINCOLN=your_lincoln_username
+TWITTER_PASSWORD_ABRAHAM_LINCOLN=your_lincoln_password
+TWITTER_USERNAME_GEORGE_MCCLELLAN=your_mcclellan_username
+TWITTER_PASSWORD_GEORGE_MCCLELLAN=your_mcclellan_password
 
 # OpenAI API Key
 OPENAI_API_KEY=your_openai_api_key
-
-# Tweet Frequency (in cron format)
-TWEET_FREQUENCY="0 * * * *"  # Every hour
 ```
 
 ## Project Structure
 
 ```
+├── src/
+│   ├── auth/
+│   │   └── Authentication.js
+│   ├── browser/
+│   │   └── BrowserManager.js
+│   ├── tweets/
+│   │   ├── TweetOperations.js
+│   │   └── ReplyOperations.js
+│   ├── utils/
+│   │   ├── ErrorHandler.js
+│   │   └── Utilities.js
+│   └── TwitterBot.js
 ├── personalities/
 │   ├── george-washington.js
 │   ├── john-adams.js
-│   └── thomas-jefferson.js
-├── bot.js
+│   ├── thomas-jefferson.js
+│   ├── abraham-lincoln.js
+│   └── george-mcclellan.js
+├── errors/
+├── chrome-profile/
 ├── index.js
 ├── .env
 └── README.md
 ```
+
+## Core Components
+
+- **TwitterBot.js**: Main bot implementation handling core functionality
+- **Authentication.js**: Manages Twitter login and session handling
+- **BrowserManager.js**: Controls browser automation with Puppeteer
+- **TweetOperations.js**: Handles tweet creation and posting
+- **ReplyOperations.js**: Manages reply functionality
+- **ErrorHandler.js**: Provides robust error handling and logging
+- **Utilities.js**: Common utility functions
+- **Personality Files**: Individual configuration and prompts for each historical figure
 
 ## Running the Bots
 
@@ -71,24 +101,25 @@ node index.js
 ```
 
 The bots will:
-1. Initialize and log in to their respective Twitter accounts
-2. Generate historically accurate tweets using GPT
-3. Post tweets on the scheduled interval
-4. Add random delays between posts to appear more natural
+1. Initialize browser sessions
+2. Authenticate with Twitter
+3. Generate historically accurate content using GPT
+4. Post tweets and interact with other users
+5. Handle errors and maintain logs
 
 ## Personality Customization
 
 Each historical figure's personality is defined in their respective file under the `personalities/` directory. You can modify:
-- Characteristics
-- Writing style
-- Topics of interest
-- Prompt engineering for GPT
+- Character traits and mannerisms
+- Writing style and tone
+- Topics of interest and expertise
+- GPT prompt engineering parameters
 
 ## Safety Features
 
-- Random delays between posts to avoid suspicious activity
-- Non-headless browser mode for monitoring
-- Error handling and logging
+- Sophisticated error handling and recovery
+- Browser session management
+- Detailed logging system
 - Graceful shutdown handling
 
 ## Note
