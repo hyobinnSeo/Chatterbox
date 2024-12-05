@@ -6,9 +6,11 @@ const ErrorHandler = require('./utils/ErrorHandler');
 const path = require('path');
 
 class TwitterBot {
-    constructor(credentials, personality) {
+    constructor(credentials, personality, allBotUsernames, targetUser) {
         this.credentials = credentials;
         this.personality = personality;
+        this.allBotUsernames = allBotUsernames;
+        this.targetUser = targetUser;
         this.browserManager = new BrowserManager();
     }
 
@@ -23,13 +25,14 @@ class TwitterBot {
             // Initialize components
             const auth = new Authentication(page, this.credentials, this.personality, errorHandler);
             const tweetOps = new TweetOperations(page, this.personality, errorHandler);
-            const replyOps = new ReplyOperations(page, this.personality, errorHandler);
+            const replyOps = new ReplyOperations(page, this.personality, errorHandler, this.credentials.username, this.allBotUsernames);
 
             // Execute workflow
             await auth.login();
-            await replyOps.replyToUserFromNotifications('libertybelltail');
+            await replyOps.replyToSpecificUserFromNotifications(this.targetUser);
             await tweetOps.readFollowingTweets();
-            await replyOps.replyToSpecificUser('libertybelltail');
+            await replyOps.replyToSpecificUser(this.targetUser);
+            await replyOps.replyToBotTweets();
             const tweet = await tweetOps.generateTweet();
             await tweetOps.postTweet(tweet);
             await auth.logout();

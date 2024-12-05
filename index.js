@@ -5,6 +5,9 @@ const georgeWashington = require('./personalities/george-washington');
 const johnAdams = require('./personalities/john-adams');
 const thomasJefferson = require('./personalities/thomas-jefferson');
 
+// Configure target user
+const targetUser = 'libertybelltail';
+
 // Configure bot instances
 const bots = [
     {
@@ -30,6 +33,9 @@ const bots = [
     }
 ];
 
+// Extract all bot usernames
+const allBotUsernames = bots.map(bot => bot.credentials.username);
+
 // Fisher-Yates shuffle algorithm
 function shuffleArray(array) {
     const shuffled = [...array];
@@ -51,7 +57,7 @@ async function runAllBots() {
         
         for (const bot of shuffledBots) {
             try {
-                const twitterBot = new TwitterBot(bot.credentials, bot.personality);
+                const twitterBot = new TwitterBot(bot.credentials, bot.personality, allBotUsernames, targetUser);
                 await twitterBot.run();
                 
                 // Add random delay between bots (1-5 minutes) to avoid suspicious activity

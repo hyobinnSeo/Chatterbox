@@ -1,13 +1,179 @@
 const Utilities = require('../utils/Utilities');
 
 class ReplyOperations {
-    constructor(page, personality, errorHandler) {
+    constructor(page, personality, errorHandler, currentUsername, allBotUsernames) {
         this.page = page;
         this.personality = personality;
         this.errorHandler = errorHandler;
+        this.currentUsername = currentUsername;
+        this.allBotUsernames = allBotUsernames;
     }
 
-    async replyToUserFromNotifications(targetUsername) {
+    async generateReply(threadContext, isBot = false) {
+        const threadPrompt = threadContext.map(tweet =>
+            `${tweet.username}: ${tweet.content}`
+        ).join('\n');
+
+        // Use appropriate prompt based on whether we're replying to a bot or user
+        const promptToUse = isBot ? this.personality.reply_to_bot_prompt : this.personality.reply_to_user_prompt;
+
+        const systemPrompt = promptToUse + '\n' +
+            this.personality.name + '\n' +
+            this.personality.title + '\n' +
+            this.personality.years + '\n' +
+            this.personality.characteristics + '\n' +
+            this.personality.relationships + '\n' +
+            this.personality.quotes + '\n' +
+            this.personality.guidelines + '\n' +
+            `Thread context:\n${threadPrompt}\n` +
+            "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
+
+        const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant.";
+
+        console.log('\nComplete prompt being sent to OpenRouter:');
+        console.log('System message:', systemPrompt);
+        console.log('User message:', userPrompt);
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                'HTTP-Referer': 'https://chatterbox.local',
+                'X-Title': 'Chatterbox'
+            },
+            body: JSON.stringify({
+                model: "google/gemini-pro-1.5",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ]
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        let reply = data.choices[0]?.message?.content;
+
+        if (!reply) {
+            throw new Error('No response content received from OpenRouter');
+        }
+
+        return this.cleanupTweet(reply);
+    }
+
+    async processAndReplyToTweet(tweetData, targetUsername) {
+        // Navigate to the specific tweet
+        await this.page.evaluate(tweetUrl => {
+            window.location.href = tweetUrl;
+        }, tweetData.tweetUrl);
+
+        await Utilities.delay(3000);
+
+        // Get thread context
+        const threadContext = await this.getThreadContext();
+
+        // Find and click reply on the target tweet
+        await this.page.evaluate((targetContent) => {
+            const tweets = document.querySelectorAll('[data-testid="tweet"]');
+            for (const tweet of tweets) {
+                const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                if (contentElement && contentElement.textContent === targetContent) {
+                    const replyButton = tweet.querySelector('[data-testid="reply"]');
+                    if (replyButton) {
+                        replyButton.click();
+                        return;
+                    }
+                }
+            }
+        }, tweetData.content);
+
+        await Utilities.delay(2000);
+
+        // Check if we're replying to another bot
+        const isBot = this.allBotUsernames.some(botUsername => targetUsername.includes(botUsername));
+        const reply = await this.generateReply(threadContext, isBot);
+        await this.postReply(reply, targetUsername);
+    }
+
+    async replyToBotTweets() {
+        try {
+            console.log(`${this.personality.name}: Looking for other bot tweets to reply to...`);
+    
+            // Filter out current bot's username
+            const otherBotUsernames = this.allBotUsernames.filter(username => username !== this.currentUsername);
+    
+            // First ensure we're on the home page and Following tab
+            const homeSelector = '[data-testid="AppTabBar_Home_Link"]';
+            await this.page.waitForSelector(homeSelector);
+            await this.page.click(homeSelector);
+            await Utilities.delay(2000);
+
+            // Get tweets from timeline
+            const timelineTweets = await this.page.evaluate(async (otherBotUsernames) => {
+                const tweets = [];
+                let attempts = 0;
+                const maxAttempts = 5;
+
+                while (tweets.length < 10 && attempts < maxAttempts) {
+                    const tweetElements = document.querySelectorAll('[data-testid="tweet"]');
+
+                    for (const tweet of tweetElements) {
+                        const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                        const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                        const timeLink = tweet.querySelector('time').parentElement;
+                        const tweetUrl = timeLink ? timeLink.getAttribute('href') : null;
+
+                        if (usernameElement && contentElement && tweetUrl) {
+                            const username = usernameElement.textContent;
+                            // Check if this tweet is from one of our other bots
+                            if (otherBotUsernames.some(botUsername => username.includes(botUsername))) {
+                                tweets.push({
+                                    username: username,
+                                    content: contentElement.textContent,
+                                    tweetUrl
+                                });
+                                if (tweets.length >= 10) break;
+                            }
+                        }
+                    }
+
+                    if (tweets.length < 10) {
+                        window.scrollBy(0, 500);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+
+                    attempts++;
+                }
+
+                return tweets;
+            }, otherBotUsernames);
+
+            console.log(`${this.personality.name}: Found ${timelineTweets.length} tweets from other bots`);
+
+            // Process each bot tweet
+            for (const tweetData of timelineTweets) {
+                const hasReplied = await this.checkIfAlreadyReplied(tweetData);
+                if (!hasReplied) {
+                    await this.processAndReplyToTweet(tweetData, tweetData.username);
+                    break; // Only reply to one tweet per run to avoid spamming
+                } else {
+                    console.log(`${this.personality.name}: Already replied to bot tweet, skipping...`);
+                }
+            }
+
+            await this.returnToHome();
+
+        } catch (error) {
+            await this.returnToHome();
+            await this.errorHandler.handleError(error, 'Replying to bot tweets');
+        }
+    }
+
+    async replyToSpecificUserFromNotifications(targetUsername) {
         try {
             console.log(`${this.personality.name}: Checking notifications for tweets from @${targetUsername}...`);
     
@@ -171,38 +337,6 @@ class ReplyOperations {
         }
     }
 
-    async processAndReplyToTweet(tweetData, targetUsername) {
-        // Navigate to the specific tweet
-        await this.page.evaluate(tweetUrl => {
-            window.location.href = tweetUrl;
-        }, tweetData.tweetUrl);
-
-        await Utilities.delay(3000);
-
-        // Get thread context
-        const threadContext = await this.getThreadContext();
-
-        // Find and click reply on the target tweet
-        await this.page.evaluate((targetContent) => {
-            const tweets = document.querySelectorAll('[data-testid="tweet"]');
-            for (const tweet of tweets) {
-                const contentElement = tweet.querySelector('[data-testid="tweetText"]');
-                if (contentElement && contentElement.textContent === targetContent) {
-                    const replyButton = tweet.querySelector('[data-testid="reply"]');
-                    if (replyButton) {
-                        replyButton.click();
-                        return;
-                    }
-                }
-            }
-        }, tweetData.content);
-
-        await Utilities.delay(2000);
-
-        const reply = await this.generateReply(threadContext);
-        await this.postReply(reply, targetUsername);
-    }
-
     async getThreadContext() {
         return await this.page.evaluate(() => {
             const tweets = [];
@@ -238,59 +372,6 @@ class ReplyOperations {
             
             return tweets.reverse();
         });
-    }
-
-    async generateReply(threadContext) {
-        const threadPrompt = threadContext.map(tweet =>
-            `${tweet.username}: ${tweet.content}`
-        ).join('\n');
-
-        const systemPrompt = this.personality.reply_to_user_prompt + '\n' +
-            this.personality.name + '\n' +
-            this.personality.title + '\n' +
-            this.personality.years + '\n' +
-            this.personality.characteristics + '\n' +
-            this.personality.relationships + '\n' +
-            this.personality.quotes + '\n' +
-            this.personality.guidelines + '\n' +
-            `Thread context:\n${threadPrompt}\n` +
-            "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
-
-        const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant.";
-
-        console.log('\nComplete prompt being sent to OpenRouter:');
-        console.log('System message:', systemPrompt);
-        console.log('User message:', userPrompt);
-
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                'HTTP-Referer': 'https://chatterbox.local',
-                'X-Title': 'Chatterbox'
-            },
-            body: JSON.stringify({
-                model: "google/gemini-pro-1.5",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt }
-                ]
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        let reply = data.choices[0]?.message?.content;
-
-        if (!reply) {
-            throw new Error('No response content received from OpenRouter');
-        }
-
-        return this.cleanupTweet(reply);
     }
 
     async postReply(reply, targetUsername) {
