@@ -9,7 +9,7 @@ class ReplyOperations {
         this.allBotUsernames = allBotUsernames;
     }
 
-    async generateReply(threadContext, isBot = false) {
+    async generateReply(threadContext, isBot = false, isFromNotification = false) {
         const threadPrompt = threadContext.map(tweet =>
             `${tweet.username}: ${tweet.content}`
         ).join('\n');
@@ -28,7 +28,10 @@ class ReplyOperations {
             `Thread context:\n${threadPrompt}\n` +
             "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
 
-        const userPrompt = "Generate a reply to the tweet while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant.";
+        // Different user prompts based on context
+        const userPrompt = isFromNotification
+            ? "Generate a reply to this notification. This is someone directly engaging with you, so consider the personal nature of the interaction while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant."
+            : "Generate a reply to this tweet you found while browsing the timeline. You're choosing to engage with this tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant.";
 
         console.log('\nComplete prompt being sent to OpenRouter:');
         console.log('System message:', systemPrompt);
@@ -65,7 +68,7 @@ class ReplyOperations {
         return this.cleanupTweet(reply);
     }
 
-    async processAndReplyToTweet(tweetData, targetUsername) {
+    async processAndReplyToTweet(tweetData, targetUsername, isFromNotification = false) {
         // Navigate to the specific tweet
         await this.page.evaluate(tweetUrl => {
             window.location.href = tweetUrl;
@@ -95,7 +98,7 @@ class ReplyOperations {
 
         // Check if we're replying to another bot
         const isBot = this.allBotUsernames.some(botUsername => targetUsername.includes(botUsername));
-        const reply = await this.generateReply(threadContext, isBot);
+        const reply = await this.generateReply(threadContext, isBot, isFromNotification);
         await this.postReply(reply, targetUsername);
     }
 
@@ -158,7 +161,7 @@ class ReplyOperations {
             for (const tweetData of timelineTweets) {
                 const hasReplied = await this.checkIfAlreadyReplied(tweetData);
                 if (!hasReplied) {
-                    await this.processAndReplyToTweet(tweetData, tweetData.username);
+                    await this.processAndReplyToTweet(tweetData, tweetData.username, false);
                     break; // Only reply to one tweet per run to avoid spamming
                 } else {
                     console.log(`${this.personality.name}: Already replied to bot tweet, skipping...`);
@@ -228,7 +231,7 @@ class ReplyOperations {
                         continue;
                     }
     
-                    await this.processAndReplyToTweet(tweetData, targetUsername);
+                    await this.processAndReplyToTweet(tweetData, targetUsername, true);
     
                     // Mark this tweet as processed
                     processedTweets.add(tweetData.tweetUrl);
@@ -303,7 +306,7 @@ class ReplyOperations {
                     continue;
                 }
     
-                await this.processAndReplyToTweet(notification, notification.username);
+                await this.processAndReplyToTweet(notification, notification.username, true);
                 break; // Only reply to one notification per run to avoid spamming
             }
     
@@ -378,7 +381,7 @@ class ReplyOperations {
             for (const tweetData of targetTweetsData) {
                 const hasReplied = await this.checkIfAlreadyReplied(tweetData);
                 if (!hasReplied) {
-                    await this.processAndReplyToTweet(tweetData, targetUsername);
+                    await this.processAndReplyToTweet(tweetData, targetUsername, false);
                     break;
                 } else {
                     console.log(`${this.personality.name}: Already replied to tweet, skipping...`);
