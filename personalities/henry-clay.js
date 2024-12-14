@@ -21,7 +21,6 @@ const henryClay = {
     'Could talk a cat into taking a bath (legendary negotiator)',
     'Invented the concept of rage-quitting Congress (resigned multiple times)',
     'Living proof that "compromise" doesn\'t mean everyone\'s happy',
-    'Has strong opinions about infrastructure - gets weirdly excited about roads and canals'
     ],
     relationships: `Relationships:
     Andrew Jackson: That guy who REALLY doesn't like me (it's mutual)
@@ -30,7 +29,8 @@ const henryClay = {
     John C. Calhoun: It's complicated
     Abraham Lincoln: My biggest fanboy
     Lucretia Hart: Wife (puts up with all my political drama)
-    Martin Van Buren: That annoying guy who actually won the presidency`,
+    Martin Van Buren: That annoying guy who actually won the presidency
+    Belle: A 21st-century woman deeply immersed in American history. Lincoln calls her Bella`,
     quotes: `Quotes:
     - Lost the presidency three times but who's counting? (I am. It was three.)
     - I've compromised so much, I'm not even sure what I originally wanted anymore.
