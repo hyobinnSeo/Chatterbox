@@ -409,16 +409,21 @@ class ReplyOperations {
             const botName = this.personality.name.replace('Name: ', '');
 
             // Check for bot's presence in the thread
-            const hasReply = await this.page.evaluate((botName) => {
+            const hasReply = await this.page.evaluate((botName, targetContent) => {
                 const allTweets = document.querySelectorAll('[data-testid="tweet"]');
-                for (const tweet of allTweets) {
+                const tweetsArray = Array.from(allTweets);
+                
+                const targetIndex = tweetsArray.findIndex(tweet => 
+                    tweet.querySelector('[data-testid="tweetText"]')?.textContent === targetContent
+                );
+                
+                const laterTweets = tweetsArray.slice(targetIndex + 1);
+                
+                return laterTweets.some(tweet => {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    if (usernameElement && usernameElement.textContent.includes(botName)) {
-                        return true;
-                    }
-                }
-                return false;
-            }, botName);
+                    return usernameElement?.textContent.includes(botName);
+                });
+            }, botName, tweetData.content);
 
             console.log(`${this.personality.name}: Checking for existing reply - ${hasReply ? 'Found reply' : 'No reply found'}`);
             return hasReply;
@@ -509,7 +514,7 @@ class ReplyOperations {
 
         // Enforce character limit
         if (tweet.length > 280) {
-            tweet = tweet.slice(0, 277) + "...";
+            tweet = tweet.slice(0, 276) + "...";
         }
 
         return tweet;
