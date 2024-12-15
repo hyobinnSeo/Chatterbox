@@ -8,6 +8,8 @@ const abrahamLincoln = require('./personalities/abraham-lincoln');
 const georgeMcClellan = require('./personalities/george-mcclellan');
 const henryClay = require('./personalities/henry-clay');
 const johnCCalhoun = require('./personalities/john-c-calhoun');
+const henryJackson = require('./personalities/henry-jackson');
+const andrewJackson = require('./personalities/andrew-jackson');
 
 // Configure target user
 const targetUser = 'libertybelltail';
@@ -62,6 +64,20 @@ const bots = [
             password: process.env.TWITTER_PASSWORD_JOHN_C_CALHOUN
         },
         personality: johnCCalhoun
+    },
+    {
+        credentials: {
+            username: process.env.TWITTER_USERNAME_HENRY_M_JACKSON,
+            password: process.env.TWITTER_PASSWORD_HENRY_M_JACKSON
+        },
+        personality: henryJackson
+    },
+    {
+        credentials: {
+            username: process.env.TWITTER_USERNAME_ANDREW_JACKSON,
+            password: process.env.TWITTER_PASSWORD_ANDREW_JACKSON
+        },
+        personality: andrewJackson
     }
 ];
 
