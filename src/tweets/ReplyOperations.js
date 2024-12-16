@@ -10,9 +10,23 @@ class ReplyOperations {
     }
 
     async generateReply(threadContext, isBot = false, isFromNotification = false) {
-        const threadPrompt = threadContext.map(tweet =>
+        // Convert thread context to string format
+        let threadPrompt = threadContext.map(tweet =>
             `${tweet.username}: ${tweet.content}`
         ).join('\n');
+
+        // If thread prompt exceeds 10,000 characters, truncate from the start
+        // keeping the most recent context
+        if (threadPrompt.length > 10000) {
+            const tweets = threadPrompt.split('\n');
+            threadPrompt = '';
+            for (let i = tweets.length - 1; i >= 0; i--) {
+                const newPrompt = tweets[i] + '\n' + threadPrompt;
+                if (newPrompt.length > 10000) break;
+                threadPrompt = newPrompt;
+            }
+            threadPrompt = threadPrompt.trim();
+        }
 
         // Use appropriate prompt based on whether we're replying to a bot or user
         const promptToUse = isBot ? this.personality.reply_to_bot_prompt : this.personality.reply_to_user_prompt;
