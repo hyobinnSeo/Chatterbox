@@ -125,12 +125,26 @@ class ReplyOperations {
                     const tweetElements = document.querySelectorAll('[data-testid="tweet"]');
 
                     for (const tweet of tweetElements) {
-                        const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                        const contentElement = tweet.querySelector('[data-testid="tweetText"]');
-                        const timeLink = tweet.querySelector('time').parentElement;
-                        const tweetUrl = timeLink ? timeLink.getAttribute('href') : null;
+                        try {
+                            const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                            const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                            const timeElement = tweet.querySelector('time');
+                            
+                            // Add null checks for all elements
+                            if (!usernameElement || !contentElement || !timeElement) {
+                                continue;
+                            }
 
-                        if (usernameElement && contentElement && tweetUrl) {
+                            const timeLink = timeElement.parentElement;
+                            if (!timeLink) {
+                                continue;
+                            }
+
+                            const tweetUrl = timeLink.getAttribute('href');
+                            if (!tweetUrl) {
+                                continue;
+                            }
+
                             const username = usernameElement.textContent;
                             // Check if this tweet is from one of our other bots
                             if (otherBotUsernames.some(botUsername => username.includes(botUsername))) {
@@ -141,6 +155,9 @@ class ReplyOperations {
                                 });
                                 if (tweets.length >= 10) break;
                             }
+                        } catch (err) {
+                            console.error('Error processing tweet:', err);
+                            continue;
                         }
                     }
 
@@ -269,26 +286,47 @@ class ReplyOperations {
                 const botTweets = [];
     
                 for (const notification of notifications) {
-                    const usernameElement = notification.querySelector('[data-testid="User-Name"]');
-                    if (usernameElement && otherBotUsernames.some(botUsername => 
-                        usernameElement.textContent.includes(botUsername))) {
-                        
+                    try {
+                        const usernameElement = notification.querySelector('[data-testid="User-Name"]');
                         const contentElement = notification.querySelector('[data-testid="tweetText"]');
+                        const timeElement = notification.querySelector('time');
+                        
+                        // Add null checks for all elements
+                        if (!usernameElement || !contentElement || !timeElement) {
+                            continue;
+                        }
+
+                        // Only process if it's from another bot
+                        if (!otherBotUsernames.some(botUsername => 
+                            usernameElement.textContent.includes(botUsername))) {
+                            continue;
+                        }
+                        
                         const replyCount = notification.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
                         const hasReplies = replyCount && parseInt(replyCount.textContent) > 0;
     
-                        if (contentElement && !hasReplies) {
-                            const timeLink = notification.querySelector('time').parentElement;
-                            const tweetUrl = timeLink ? timeLink.getAttribute('href') : null;
-    
-                            if (tweetUrl) {
-                                botTweets.push({
-                                    username: usernameElement.textContent,
-                                    content: contentElement.textContent,
-                                    tweetUrl
-                                });
-                            }
+                        if (hasReplies) {
+                            continue;
                         }
+
+                        const timeLink = timeElement.parentElement;
+                        if (!timeLink) {
+                            continue;
+                        }
+
+                        const tweetUrl = timeLink.getAttribute('href');
+                        if (!tweetUrl) {
+                            continue;
+                        }
+
+                        botTweets.push({
+                            username: usernameElement.textContent,
+                            content: contentElement.textContent,
+                            tweetUrl
+                        });
+                    } catch (err) {
+                        console.error('Error processing notification:', err);
+                        continue;
                     }
                 }
                 return botTweets;
@@ -298,16 +336,21 @@ class ReplyOperations {
     
             // Process each bot notification
             for (const notification of botNotifications) {
-                // Check thread depth before replying
-                const threadDepth = await this.getThreadDepth(notification.tweetUrl);
-                
-                if (threadDepth >= 3) {
-                    console.log(`${this.personality.name}: Thread depth (${threadDepth}) exceeds limit, skipping...`);
+                try {
+                    // Check thread depth before replying
+                    const threadDepth = await this.getThreadDepth(notification.tweetUrl);
+                    
+                    if (threadDepth >= 3) {
+                        console.log(`${this.personality.name}: Thread depth (${threadDepth}) exceeds limit, skipping...`);
+                        continue;
+                    }
+        
+                    await this.processAndReplyToTweet(notification, notification.username, true);
+                    break; // Only reply to one notification per run to avoid spamming
+                } catch (err) {
+                    console.error('Error processing notification:', err);
                     continue;
                 }
-    
-                await this.processAndReplyToTweet(notification, notification.username, true);
-                break; // Only reply to one notification per run to avoid spamming
             }
     
             await this.returnToHome();
