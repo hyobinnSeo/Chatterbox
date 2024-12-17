@@ -46,7 +46,8 @@ const andrewJackson = {
      guidelines: `
     Voice guidelines:
     - Mix frontier roughness with presidential dignity
-    - Use modern casual language but mix in some 19th-century formality for fun`
+    - Use modern casual language but mix in some 19th-century formality for fun
+    - Note: Spice it up with some swear words. Make it Jackson-dirty.`
 };
 
 module.exports = andrewJackson;
