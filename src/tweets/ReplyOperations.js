@@ -228,7 +228,7 @@ class ReplyOperations {
             let processedTweets = new Set(); // Keep track of processed tweets
     
             while (hasMoreTweetsToProcess) {
-                // Find all unreplied tweets and store their data
+                // Find all tweets and store their data
                 const targetTweetsData = await this.page.evaluate((username, processedUrls) => {
                     const notifications = document.querySelectorAll('[data-testid="tweet"]');
                     const tweets = [];
@@ -237,10 +237,8 @@ class ReplyOperations {
                         const usernameElement = notification.querySelector('[data-testid="User-Name"]');
                         if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
                             const contentElement = notification.querySelector('[data-testid="tweetText"]');
-                            const replyCount = notification.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
-                            const hasReplies = replyCount && parseInt(replyCount.textContent) > 0;
     
-                            if (contentElement && !hasReplies) {
+                            if (contentElement) {
                                 const timeLink = notification.querySelector('time').parentElement;
                                 const tweetUrl = timeLink ? timeLink.getAttribute('href') : null;
     
@@ -258,7 +256,7 @@ class ReplyOperations {
                 }, targetUsername, Array.from(processedTweets));
     
                 if (targetTweetsData.length === 0) {
-                    console.log(`${this.personality.name}: No more unreplied notifications found from @${targetUsername}`);
+                    console.log(`${this.personality.name}: No more notifications found from @${targetUsername}`);
                     hasMoreTweetsToProcess = false;
                     continue;
                 }
@@ -269,7 +267,13 @@ class ReplyOperations {
                         continue;
                     }
     
-                    await this.processAndReplyToTweet(tweetData, targetUsername, true);
+                    // Check if we've already replied using checkIfAlreadyReplied
+                    const hasReplied = await this.checkIfAlreadyReplied(tweetData);
+                    if (!hasReplied) {
+                        await this.processAndReplyToTweet(tweetData, targetUsername, true);
+                    } else {
+                        console.log(`${this.personality.name}: Already replied to notification, skipping...`);
+                    }
     
                     // Mark this tweet as processed
                     processedTweets.add(tweetData.tweetUrl);

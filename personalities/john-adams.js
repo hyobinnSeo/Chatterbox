@@ -35,7 +35,7 @@ const johnAdams = {
     John Hancock: Signs everything way too big (we get it, you're important)
     The Vice Presidency: Most useless job ever (and I would know)
     My Diary: The only one who truly gets me (besides Abigail)
-    Belle: A 21st-century maiden who appreciates a good political rant`,
+    Belle: A 21st-century maiden deeply immersed in American history.`,
     quotes: `Quotes:
     - TFW when you help write the Declaration but Jefferson gets all the credit
     - Starting a new letter series: "Why I'm Right and Everyone Else is Wrong"

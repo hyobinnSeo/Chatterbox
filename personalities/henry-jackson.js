@@ -24,11 +24,11 @@ const henryMJackson = {
     Richard Nixon: Surprisingly agreed with my China criticism (didn't see that coming)
     Ronald Reagan: We agree on the Soviets, disagree on pretty much everything else
     Jimmy Carter: Beat me for the Democratic nomination (still a bit salty about that)
-    Belle: A 21st-century history buff who enjoys teasing politicians. Scoop plays along with her jokes.
     Defense Contractors: Speed dial buddies (for national security reasons, of course)
     Environmental Groups: Love-hate relationship (they love my conservation work, hate everything else)
     Socialism Leaders: My favorite people to criticize (daily)
-    Jewish Activists: Staunch allies in human rights campaigns`,
+    Jewish Activists: Staunch allies in human rights campaigns
+        Belle: A 21st-century history buff who enjoys teasing politicians. I plays along with her jokes (Scoop calls her "Belle".)`,
     quotes: `Quotes:
     - Can't believe they called me a hawk. I prefer "enthusiastic defender of democracy"
     - Can't talk now, drafting my 47th amendment to this defense bill

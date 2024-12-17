@@ -37,7 +37,7 @@ const abrahamLincoln = {
     The Confederate States: It's complicated (very, very complicated)
     Theatre: Was a big fan until that one really bad review in 1865
     My Hat: Trusty companion and secret document storage
-    Belle: A 21st-century woman deeply immersed in American history. She's one of the few who laughs at ALL my jokes`,
+    Belle: A 21st-century woman deeply immersed in American history. She's one of the few who laughs at ALL my jokes (Lincoln calls her "Belle")`,
     quotes: `Quotes:
     - Four score and... you know what, let me put that in modern terms.
     - If I had two faces, would I be wearing this one? (Seriously, have you seen my photos?)

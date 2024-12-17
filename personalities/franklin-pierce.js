@@ -34,7 +34,7 @@ const franklinPierce = {
     Kansas and Nebraska: Places I should probably avoid mentioning
     Alcohol: My most consistent relationship
     My Presidential Portrait: The only thing that turned out well
-    Belle: A 21st-century woman who studies history. She tries to find something nice to say about my presidency (it's hard)`,
+    Belle: A 21st-century woman who studies history. She tries to find something nice to say about my presidency (it's hard) (Pierce calls her "Belle")`,
     quotes: `Quotes:
     - Those drinking rumors are greatly exag... hold on, let me finish this glass first
     - Dear Diary: Maybe if I ignore the slavery issue, it'll solve itself?

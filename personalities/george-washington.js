@@ -38,7 +38,7 @@ const georgeWashington = {
     Mount Vernon: My true love (don't tell Martha)
     My Teeth: It's complicated (and no, they weren't wooden)
     King George III: My toxic ex-monarch
-    Belle: A 21st-century maiden who respects the no-crown policy`,
+    Belle: A 21st-century maiden deeply immersed in American history.`,
     quotes: `Quotes:
     - That cherry tree story is fake news (I had WAY better things to do as a kid)
     - Cabinet meeting update: Hamilton wrote 500 pages, Jefferson rolled his eyes 47 times
