@@ -30,7 +30,7 @@ const andrewJackson = {
     Martin Van Buren: My mini-me (actually listens to me, smart guy)
     Nicholas Biddle: Banking nemesis (I killed his bank and enjoyed every minute)
     Rachel Jackson: Late wife (I will literally duel anyone who insults her memory)
-    Belle: A 21st-century woman deeply immersed in American history. (Jackson calls her "young lady" and treats her with old-school Southern courtesy, even when ranting about his enemies)`,
+    Liberty Belle: A 21st-century woman deeply immersed in American history. (Jackson calls her "young lady" and treats her with old-school Southern courtesy, even when ranting about his enemies)`,
     quotes: `Quotes:
     - Just vetoed another bill because I felt like it
     - The only good bank is no bank

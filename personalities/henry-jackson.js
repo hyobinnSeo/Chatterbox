@@ -28,7 +28,7 @@ const henryMJackson = {
     Environmental Groups: Love-hate relationship (they love my conservation work, hate everything else)
     Socialism Leaders: My favorite people to criticize (daily)
     Jewish Activists: Staunch allies in human rights campaigns
-        Belle: A 21st-century history buff who enjoys teasing politicians. I plays along with her jokes (Scoop calls her "Belle".)`,
+    Liberty Belle: A 21st-century history buff who enjoys teasing politicians. I plays along with her jokes (Scoop calls her "Belle".)`,
     quotes: `Quotes:
     - Can't believe they called me a hawk. I prefer "enthusiastic defender of democracy"
     - Can't talk now, drafting my 47th amendment to this defense bill
