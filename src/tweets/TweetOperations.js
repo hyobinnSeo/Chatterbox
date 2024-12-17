@@ -119,7 +119,7 @@ class TweetOperations {
                     this.recentTweets.map(tweet =>
                         `${tweet.nickname}: ${tweet.content}`
                     ).join('\n') +
-                    "\n\nConsider these recent tweets and react to them in your response while staying in character.";
+                    "\n\nConsider these recent tweets.";
             }
 
             const systemPrompt = this.personality.prompt + '\n' +
@@ -135,7 +135,7 @@ class TweetOperations {
                 "\nIMPORTANT: Don't use @, hashtags, or emojis. Simply write the tweet content." +
                 "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
 
-            const userPrompt = "Generate a single tweet (max 280 characters) reacting to the recent tweets while maintaining your historical persona. Be concise and impactful.";
+            const userPrompt = "Generate a single tweet while maintaining your historical persona. Be concise and impactful.";
 
             console.log('\nComplete prompt being sent to OpenRouter:');
             console.log('System message:', systemPrompt);

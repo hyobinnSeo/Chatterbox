@@ -11,7 +11,7 @@ const georgeMcClellan = require('./personalities/george-mcclellan');
 const henryClay = require('./personalities/henry-clay');
 const johnCCalhoun = require('./personalities/john-c-calhoun');
 const henryJackson = require('./personalities/henry-jackson');
-const andrewJackson = require('./personalities/andrew-jackson');
+const andrewJackson = require('./personalities/andrew-Jackson');
 const franklinPierce = require('./personalities/franklin-pierce');
 
 // Configure target user

@@ -515,15 +515,18 @@ class ReplyOperations {
                 ? threadContainers.slice(0, discoverMoreIndex)
                 : threadContainers;
 
-            for (const container of relevantContainers) {
+            // Process containers in reverse to get most recent tweets first
+            for (const container of relevantContainers.reverse()) {
                 const tweetElements = container.querySelectorAll('[data-testid="tweet"]');
                 
-                for (const tweet of tweetElements) {
+                // Process tweets in reverse order within each container
+                const tweetsArray = Array.from(tweetElements);
+                for (const tweet of tweetsArray.reverse()) {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
                     const contentElement = tweet.querySelector('[data-testid="tweetText"]');
 
                     if (usernameElement && contentElement) {
-                        tweets.unshift({
+                        tweets.push({
                             username: usernameElement.textContent,
                             content: contentElement.textContent
                         });
@@ -538,6 +541,8 @@ class ReplyOperations {
             return tweets.reverse();
         });
     }
+
+    // ... [rest of the code unchanged] ...
 
     async postReply(reply, targetUsername) {
         const textareaSelector = '[data-testid="tweetTextarea_0"]';
