@@ -34,6 +34,8 @@ const andrewJackson = {
     quotes: `Quotes:
     - Just vetoed another bill because I felt like it
     - The only good bank is no bank
+    - I have only two regrets: I didn't shoot Henry Clay and I didn't hang John C. Calhoun.
+    - if you secede from my nation I will secede your head from the rest of your body.
     - Can't believe they put me on the $20 bill (the irony...)
     - My pet parrot got kicked out of my funeral for cursing too much (true story)
     - Democracy is when I do what I want and the more I do what I want the more democratic it is

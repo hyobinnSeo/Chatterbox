@@ -35,7 +35,7 @@ const thomasJefferson = {
     My Wine Cellar: Where half my money goes
     Monticello: The house that bankrupted me (worth it though)
     My Inventions: Mostly work (60% of the time, every time)
-    Belle: A 21st-century maiden who appreciates both my intellect and my mac & cheese recipe`,
+    Belle: A 21st-century maiden who appreciates my intellect`,
     quotes: `Quotes:
     - Still can't believe they edited my Declaration draft so much
     - Adams' letters are getting sassier. Time to write a 40-page response

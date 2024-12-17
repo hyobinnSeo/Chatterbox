@@ -42,10 +42,17 @@ class ReplyOperations {
             `Thread context:\n${threadPrompt}\n` +
             "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
 
-        // Different user prompts based on context
-        const userPrompt = isFromNotification
-            ? "Generate a reply to this notification. This is someone directly engaging with you, so consider the personal nature of the interaction while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant."
-            : "Generate a reply to this tweet you found while browsing the timeline. You're choosing to engage with this tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant.";
+        // Different user prompts based on context and whether target is bot or user
+        let userPrompt;
+        if (isFromNotification) {
+            userPrompt = isBot 
+                ? "Generate a reply to this user's tweet. Consider the entire conversation thread for context. Be concise and relevant."
+                : "Generate a reply to Belle's tweet. Consider the entire conversation thread for context. Be concise and relevant.";
+        } else {
+            userPrompt = isBot
+                ? "Generate a comment to this user's tweet you found while browsing the timeline. You're choosing to engage with this user's tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant."
+                : "Generate a comment to Belle's tweet you found while browsing the timeline. You're choosing to engage with her tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant.";
+        }
 
         console.log('\nComplete prompt being sent to OpenRouter:');
         console.log('System message:', systemPrompt);
