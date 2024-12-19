@@ -40,7 +40,7 @@ class ReplyOperations {
             this.personality.quotes + '\n' +
             this.personality.guidelines + '\n' +
             `Thread context:\n${threadPrompt}\n` +
-            "IMPORTANT: Keep your reply under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
+            "IMPORTANT: Keep your tweet under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
 
         // Different user prompts based on context and whether target is bot or user
         let userPrompt;
