@@ -21,15 +21,26 @@ class BrowserManager {
                 '--disable-translate-script-url',
                 '--disable-sync',
                 '--disable-auto-translate',
-                '--disable-client-side-phishing-detection'
+                '--disable-client-side-phishing-detection',
+                '--font-render-hinting=medium',
+                '--force-color-profile=srgb',
+                '--force-device-scale-factor=1'
             ]
         });
 
         this.page = await this.browser.newPage();
-
-        // Set language preferences
+        
+        // Set proper encoding for Unicode/emoji support
+        await this.page.setDefaultNavigationTimeout(0);
         await this.page.setExtraHTTPHeaders({
-            'Accept-Language': 'en-US,en;q=0.9'
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Charset': 'utf-8'
+        });
+
+        // Ensure proper encoding in the page
+        await this.page.evaluateOnNewDocument(() => {
+            document.charset = 'utf-8';
+            document.characterSet = 'utf-8';
         });
 
         // Override language settings

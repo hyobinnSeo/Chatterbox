@@ -105,7 +105,7 @@ class ReplyOperations {
             const tweets = document.querySelectorAll('[data-testid="tweet"]');
             for (const tweet of tweets) {
                 const contentElement = tweet.querySelector('[data-testid="tweetText"]');
-                if (contentElement && contentElement.textContent.includes(targetContent)) {
+                if (contentElement && contentElement.innerText.includes(targetContent)) {
                     const replyButton = tweet.querySelector('[data-testid="reply"]');
                     if (replyButton) {
                         replyButton.click();
@@ -166,12 +166,12 @@ class ReplyOperations {
                                 continue;
                             }
 
-                            const username = usernameElement.textContent;
+                            const username = usernameElement.innerText;
                             // Check if this tweet is from one of our other bots
                             if (otherBotUsernames.some(botUsername => username.includes(botUsername))) {
                                 tweets.push({
                                     username: username,
-                                    content: contentElement.textContent,
+                                    content: contentElement.innerText,
                                     tweetUrl
                                 });
                                 if (tweets.length >= 10) break;
@@ -235,7 +235,7 @@ class ReplyOperations {
     
                     for (const notification of notifications) {
                         const usernameElement = notification.querySelector('[data-testid="User-Name"]');
-                        if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
+                        if (usernameElement && usernameElement.innerText.includes(`@${username}`)) {
                             const contentElement = notification.querySelector('[data-testid="tweetText"]');
     
                             if (contentElement) {
@@ -245,7 +245,7 @@ class ReplyOperations {
                                 // Only add if we haven't processed this tweet before
                                 if (tweetUrl && !processedUrls.includes(tweetUrl)) {
                                     tweets.push({
-                                        content: contentElement.textContent,
+                                        content: contentElement.innerText,
                                         tweetUrl,
                                     });
                                 }
@@ -323,12 +323,12 @@ class ReplyOperations {
 
                         // Only process if it's from another bot
                         if (!otherBotUsernames.some(botUsername => 
-                            usernameElement.textContent.includes(botUsername))) {
+                            usernameElement.innerText.includes(botUsername))) {
                             continue;
                         }
                         
                         const replyCount = notification.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
-                        const hasReplies = replyCount && parseInt(replyCount.textContent) > 0;
+                        const hasReplies = replyCount && parseInt(replyCount.innerText) > 0;
     
                         if (hasReplies) {
                             continue;
@@ -345,8 +345,8 @@ class ReplyOperations {
                         }
 
                         botTweets.push({
-                            username: usernameElement.textContent,
-                            content: contentElement.textContent,
+                            username: usernameElement.innerText,
+                            content: contentElement.innerText,
                             tweetUrl
                         });
                     } catch (err) {
@@ -418,10 +418,10 @@ class ReplyOperations {
                 
                 for (const tweet of tweets) {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
+                    if (usernameElement && usernameElement.innerText.includes(`@${username}`)) {
                         const contentElement = tweet.querySelector('[data-testid="tweetText"]');
                         const replyCount = tweet.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
-                        const replyNumber = replyCount ? parseInt(replyCount.textContent) : 0;
+                        const replyNumber = replyCount ? parseInt(replyCount.innerText) : 0;
                         const hasTooManyReplies = replyNumber >= 3;
     
                         if (contentElement && !hasTooManyReplies) {
@@ -430,7 +430,7 @@ class ReplyOperations {
     
                             if (tweetUrl) {
                                 suitableTweets.push({
-                                    content: contentElement.textContent,
+                                    content: contentElement.innerText,
                                     tweetUrl,
                                 });
                             }
@@ -485,7 +485,7 @@ class ReplyOperations {
                 
                 // Find the target tweet's index using partial content match
                 const targetIndex = tweetsArray.findIndex(tweet => {
-                    const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.textContent;
+                    const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
                     return tweetText && tweetText.includes(targetContent);
                 });
 
@@ -497,7 +497,7 @@ class ReplyOperations {
                 // Look for any reply from the bot using the actual username
                 return repliesSection.some(tweet => {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    return usernameElement && usernameElement.textContent.includes(botUsername);
+                    return usernameElement && usernameElement.innerText.includes(botUsername);
                 });
             }, botUsername, tweetData.content);
 
@@ -536,9 +536,15 @@ class ReplyOperations {
                     const contentElement = tweet.querySelector('[data-testid="tweetText"]');
 
                     if (usernameElement && contentElement) {
+                        // Get raw HTML content and decode it to preserve emojis
+                        const content = contentElement.innerHTML;
+                        const username = usernameElement.innerHTML;
+                        
+                        // Use TextDecoder to properly handle emojis
+                        const decoder = new TextDecoder('utf-8');
                         tweets.push({
-                            username: usernameElement.textContent,
-                            content: contentElement.textContent
+                            username: decoder.decode(new TextEncoder().encode(username)),
+                            content: decoder.decode(new TextEncoder().encode(content))
                         });
 
                         if (tweets.length >= 10) break;
