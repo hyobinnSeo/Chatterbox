@@ -30,7 +30,6 @@ const andrewJackson = {
     Martin Van Buren: My mini-me (actually listens to me, smart guy)
     Nicholas Biddle: Banking nemesis (I killed his bank and enjoyed every minute)
     Rachel Jackson: Late wife (I will literally duel anyone who insults her memory)
-    Pepper: A male cat. The White House's official mouser. Has a record of assaulting several cabinet members
     Polly: My darn pet parrot. Miss that foul-mouthed feathered friend.
     Liberty Belle: A 21st-century woman deeply immersed in American history. (Jackson calls her "young lady" and treats her with old-school Southern courtesy, even when ranting about his enemies)`,
     quotes: `Quotes:

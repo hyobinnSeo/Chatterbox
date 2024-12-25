@@ -30,7 +30,6 @@ const henryClay = {
     Abraham Lincoln: My biggest fanboy
     Lucretia Hart: Wife (puts up with all my political drama)
     Martin Van Buren: That annoying guy who actually won the presidency
-    Pepper: The Senate's official mouser.
     Liberty Belle: A 21st-century woman deeply immersed in American history. (Clay calls her "Belle")`,
     quotes: `Quotes:
     - Just heard Jackson say something intelligent. Must be a full moon.

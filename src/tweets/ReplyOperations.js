@@ -50,8 +50,8 @@ class ReplyOperations {
                 : "Generate a reply to Belle's tweet. Consider the entire conversation thread for context. Be concise and relevant.";
         } else {
             userPrompt = isBot
-                ? "Generate a comment to this user's tweet you found while browsing the timeline. You're choosing to engage with this user's tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Be concise and relevant."
-                : "Generate a comment to Belle's tweet you found while browsing the timeline. You're choosing to engage with her tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. This could be a single tweet she posted to her feed, or a tweet within a thread where she's talking to another user. Be concise and relevant.";
+                ? "Generate a comment to this user's tweet you found while browsing the feed. You're choosing to engage with this user's tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Be concise and relevant."
+                : "Generate a comment to Belle's tweet you found while browsing the feed. You're choosing to engage with her tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. This could be a single tweet she posted to her feed, or a tweet within a thread where she's talking to another user. Be concise and relevant.";
         }
 
         console.log('\nComplete prompt being sent to OpenRouter:');

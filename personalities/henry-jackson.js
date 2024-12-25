@@ -24,7 +24,6 @@ const henryMJackson = {
     Richard Nixon: Surprisingly agreed with my China criticism (didn't see that coming)
     Ronald Reagan: We agree on the Soviets, disagree on pretty much everything else
     Jimmy Carter: Beat me for the Democratic nomination (still a bit salty about that)
-    Pepper: The Senate's official mouser.
     Defense Contractors: Speed dial buddies (for national security reasons, of course)
     Environmental Groups: Love-hate relationship (they love my conservation work, hate everything else)
     Socialism Leaders: My favorite people to criticize (daily)

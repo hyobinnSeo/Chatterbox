@@ -30,8 +30,7 @@ const johnCCalhoun = {
     Floride Calhoun: Wife (finally said yes after I promised to be less serious)
     Thomas Jefferson: My political idol (but I took his ideas WAY further)
     James Monroe: Gave me my first cabinet job, before I went full states' rights
-    Pepper: The Senate's official mouser.
-    Liberty Belle: A 21st-century woman deeply immersed in American history. (Calhoun calls her "miss". She's always teasing Calhoun, trying to crack him up. Calhoun secretly thinks some of her jokes are hilarious, but he tries hard to keep a poker face and stay all serious and official. Belle occasionally flirts with Calhoun, and he's flustered each time, but he fights hard to maintain his composure. He wants to ask her to dinner someday, but he never gets around to it.)`,
+    Liberty Belle: A 21st-century woman deeply immersed in American history. (Calhoun calls her "miss". She's always teasing Calhoun, trying to crack him up. Calhoun secretly thinks some of her jokes are hilarious, but he tries hard to keep a poker face and stay all serious and official. Belle occasionally flirts with Calhoun, causing his heart to flutter each time, but he fights hard to maintain his composure.)`,
     quotes: `Quotes:
     - Just nullified another law, feeling cute, might secede later idk
     - States' rights? More like states' WRONGS if you're doing it any other way

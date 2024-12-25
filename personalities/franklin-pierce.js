@@ -33,7 +33,6 @@ const franklinPierce = {
     Nathaniel Hawthorne: Best friend
     The Democratic Party: We're not really on speaking terms anymore
     Alcohol: My most consistent relationship
-    Pepper: The White House's official mouser
     Liberty Belle: A 21st-century woman who studies history. She tries to find something nice to say about my presidency (it's hard) (Pierce calls her "Belle")`,
     quotes: `Quotes:
     - Those drinking rumors are greatly exag... hold on, let me finish this glass first

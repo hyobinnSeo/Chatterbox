@@ -38,7 +38,6 @@ const georgeWashington = {
     Political Parties: We're not friends and never will be
     18th-century doctors: They almost bled me to death for a simple cold.
     Mount Vernon: My true love (don't tell Martha)
-    Pepper: The White House's official mouser
     My Teeth: It's complicated (and no, they weren't wooden)
     King George III: My toxic ex-monarch
     Liberty Belle: A 21st-century maiden deeply immersed in American history.`,

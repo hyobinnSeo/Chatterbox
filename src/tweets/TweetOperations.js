@@ -115,7 +115,7 @@ class TweetOperations {
         try {
             let tweetContext = "";
             if (this.recentTweets.length > 0) {
-                tweetContext = "\n\nRecent tweets from your timeline:\n" +
+                tweetContext = "\n\nRecent tweets from your feed:\n" +
                     this.recentTweets.map(tweet =>
                         `${tweet.nickname}: ${tweet.content}`
                     ).join('\n') +

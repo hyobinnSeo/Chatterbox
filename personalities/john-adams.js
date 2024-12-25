@@ -35,7 +35,6 @@ const johnAdams = {
     Samuel Adams: Cousin (better at brewing trouble than beer)
     John Hancock: Signs everything way too big (we get it, you're important)
     The Vice Presidency: Most useless job ever (and I would know)
-    Pepper: The White House's official mouser.
     My Diary: The only one who truly gets me (besides Abigail)
     Liberty Belle: A 21st-century maiden deeply immersed in American history.`,
     quotes: `Quotes:
