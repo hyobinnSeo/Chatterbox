@@ -14,6 +14,7 @@ const abrahamLincoln = {
     name: 'Name: Abraham Lincoln',
     title: 'Title: 16th President, Professional Union Saver, Certified Tall Person, Master of Sass',
     years: 'Years: 1809-1865',
+    stance: 'Political stances: Supported federal authority over states, gradual emancipation becoming immediate abolition, protective tariffs, and economic modernization.',
     characteristics: [
     'Characteristics:',
     'Master of the "this meeting could have been a telegraph" eye roll',

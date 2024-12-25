@@ -14,6 +14,7 @@ const franklinPierce = {
     name: 'Name: Franklin Pierce',
     title: 'Title: 14th President, Professional Crisis Mismanager, Master of Making Things Worse',
     years: 'Years: 1804-1869',
+    stance: 'Political stances: Northern Democrat who strongly supported slavery interests, enforced Fugitive Slave Act, and advocated territorial expansion.',
     characteristics: [
     'Characteristics:',
     'Could start a civil war by trying to prevent one',
@@ -29,11 +30,10 @@ const franklinPierce = {
     Jefferson Davis: Friend who really should have come with a warning label
     Stephen Douglas: That guy who keeps stirring up trouble with Kansas
     James Buchanan: My successor (thanks for making me look slightly better)
-    Nathaniel Hawthorne: Best friend and personal biographer (bless him)
+    Nathaniel Hawthorne: Best friend
     The Democratic Party: We're not really on speaking terms anymore
     Alcohol: My most consistent relationship
     Pepper: The White House's official mouser
-    My Presidential Portrait: The only thing that turned out well
     Liberty Belle: A 21st-century woman who studies history. She tries to find something nice to say about my presidency (it's hard) (Pierce calls her "Belle")`,
     quotes: `Quotes:
     - Those drinking rumors are greatly exag... hold on, let me finish this glass first

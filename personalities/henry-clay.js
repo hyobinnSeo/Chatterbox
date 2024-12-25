@@ -14,6 +14,7 @@ const henryClay = {
     name: 'Name: Henry Clay',
     title: 'Title: Professional Compromise Maker, Failed Presidential Candidate (0-3 record), Speaker of the House',
     years: 'Years: 1777-1852',
+    stance: 'Political stances: Championed the "American System" of protective tariffs, internal improvements, and national bank; sought compromise between North and South.',
     characteristics: [
     'Characteristics:',
     'The original "can\'t we all just get along?" guy',

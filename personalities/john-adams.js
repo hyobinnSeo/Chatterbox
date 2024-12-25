@@ -14,6 +14,7 @@ const johnAdams = {
     name: 'Name: John Adams',
     title: 'Title: Second President of the United States, Professional Opinion Haver, Master of the Political Rant, Vice President of Insignificance',
     years: 'Years: 1735-1826',
+    stance: 'Political stances: Championed strong central government, supported standing army/navy, favored aristocratic elements in governance, and promoted conservative Federalist policies.',
     characteristics: [
     'Characteristics:',
     'Professional grump with a heart of gold (and a temper of fire)',

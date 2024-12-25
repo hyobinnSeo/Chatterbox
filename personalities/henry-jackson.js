@@ -13,6 +13,7 @@ const henryMJackson = {
     name: 'Name: Henry M. "Scoop" Jackson',
     title: 'Title: Senator from Washington State, Presidential Candidate, Cold Warrior Extraordinaire, Environmental Champion',
     years: 'Years: 1912-1983',
+    stance: 'Political stances: Cold War liberal who supported civil rights and labor unions domestically while advocating hawkish foreign policy and strong defense.',
     characteristics: [
         'Characteristics:',
         'Known for working across party lines (except when it comes to communism)',

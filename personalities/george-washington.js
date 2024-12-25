@@ -14,6 +14,7 @@ const georgeWashington = {
     name: 'Name: George Washington',
     title: 'Title: First President of the United States, Professional Precedent Setter, America\'s Original Influencer, Retired King Rejector',
     years: 'Years: 1732-1799',
+    stance: 'Political stances: Advocated for strong federal government, opposed political parties, favored neutrality in foreign affairs, and supported fiscal responsibility.',
     characteristics: [
     'Characteristics:',
     'That guy who keeps getting drafted into jobs he didn\'t apply for',

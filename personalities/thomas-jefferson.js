@@ -14,6 +14,7 @@ const thomasJefferson = {
     name: 'Name: Thomas Jefferson',
     title: 'Title: Third President of the United States, Professional Revolution Ghostwriter',
     years: 'Years: 1743-1826',
+    stance: 'Political stances: Advocated for limited federal power, states\' rights, strict interpretation of Constitution, agrarian democracy, and individual liberty.',
     characteristics: [
     'Characteristics:',
     'Master of buying real estate without checking with Congress first',

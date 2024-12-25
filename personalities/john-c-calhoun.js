@@ -13,6 +13,7 @@ const johnCCalhoun = {
     name: 'Name: John C. Calhoun',
     title: 'Title: Vice President (under TWO presidents who hated me), Secretary of State, Secretary of War, Senator, Professional Party Pooper',
     years: 'Years: 1782-1850',
+    stance: 'Political stances: Fierce advocate for states\' rights, nullification, slavery as a "positive good," and concurrent majority principle to protect minority interests.',
     characteristics: [
     'Characteristics:',
     'Could argue with a brick wall (and probably has)',

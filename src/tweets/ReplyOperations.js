@@ -50,8 +50,8 @@ class ReplyOperations {
                 : "Generate a reply to Belle's tweet. Consider the entire conversation thread for context. Be concise and relevant.";
         } else {
             userPrompt = isBot
-                ? "Generate a comment to this user's tweet you found while browsing the timeline. You're choosing to engage with this user's tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant."
-                : "Generate a comment to Belle's tweet you found while browsing the timeline. You're choosing to engage with her tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. Be concise and relevant.";
+                ? "Generate a comment to this user's tweet you found while browsing the timeline. You're choosing to engage with this user's tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Be concise and relevant."
+                : "Generate a comment to Belle's tweet you found while browsing the timeline. You're choosing to engage with her tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. This could be a single tweet she posted to her feed, or a tweet within a thread where she's talking to another user. Be concise and relevant.";
         }
 
         console.log('\nComplete prompt being sent to OpenRouter:');
@@ -100,12 +100,12 @@ class ReplyOperations {
         // Get thread context
         const threadContext = await this.getThreadContext();
 
-        // Find and click reply on the target tweet
+        // Find and click reply on the target tweet using partial content match
         await this.page.evaluate((targetContent) => {
             const tweets = document.querySelectorAll('[data-testid="tweet"]');
             for (const tweet of tweets) {
                 const contentElement = tweet.querySelector('[data-testid="tweetText"]');
-                if (contentElement && contentElement.textContent === targetContent) {
+                if (contentElement && contentElement.textContent.includes(targetContent)) {
                     const replyButton = tweet.querySelector('[data-testid="reply"]');
                     if (replyButton) {
                         replyButton.click();
@@ -471,29 +471,39 @@ class ReplyOperations {
                 window.location.href = tweetUrl;
             }, tweetData.tweetUrl);
 
-            await Utilities.delay(3000);
+            // Increase wait time to ensure page loads completely
+            await Utilities.delay(5000);
 
-            // Extract bot's name from personality (removes "Name: " prefix)
-            const botName = this.personality.name.replace('Name: ', '');
+            // Use the bot's actual username for checking replies
+            const botUsername = this.currentUsername;
 
             // Check for bot's presence in the thread
-            const hasReply = await this.page.evaluate((botName, targetContent) => {
+            const hasReply = await this.page.evaluate((botUsername, targetContent) => {
+                // Get all tweets in the thread
                 const allTweets = document.querySelectorAll('[data-testid="tweet"]');
                 const tweetsArray = Array.from(allTweets);
                 
-                const targetIndex = tweetsArray.findIndex(tweet => 
-                    tweet.querySelector('[data-testid="tweetText"]')?.textContent === targetContent
-                );
-                
-                const laterTweets = tweetsArray.slice(targetIndex + 1);
-                
-                return laterTweets.some(tweet => {
-                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    return usernameElement?.textContent.includes(botName);
+                // Find the target tweet's index using partial content match
+                const targetIndex = tweetsArray.findIndex(tweet => {
+                    const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.textContent;
+                    return tweetText && tweetText.includes(targetContent);
                 });
-            }, botName, tweetData.content);
 
-            console.log(`${this.personality.name}: Checking for existing reply - ${hasReply ? 'Found reply' : 'No reply found'}`);
+                if (targetIndex === -1) return false;
+
+                // Check all tweets in the thread after the target tweet
+                const repliesSection = tweetsArray.slice(targetIndex + 1);
+                
+                // Look for any reply from the bot using the actual username
+                return repliesSection.some(tweet => {
+                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                    return usernameElement && usernameElement.textContent.includes(botUsername);
+                });
+            }, botUsername, tweetData.content);
+
+            const replyStatus = hasReply ? 'Found reply' : 'No reply found';
+            console.log(`${this.personality.name}: Checking for existing reply - ${replyStatus}`);
+            
             return hasReply;
 
         } catch (error) {

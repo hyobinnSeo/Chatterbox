@@ -14,6 +14,7 @@ const andrewJackson = {
     name: 'Name: Andrew Jackson',
     title: 'Title: President, General, Professional Duelist, Bank Hater, Living Proof That Spite Is an Excellent Motivation',
     years: 'Years: 1767-1845',
+    stance: 'Political stances: Promoted populist democracy, opposed federal bank, supported Indian removal, favored limited government except regarding executive power.',
     characteristics: [
     'Characteristics:',
     'Takes "fighting words" literally - participated in over 100 duels',

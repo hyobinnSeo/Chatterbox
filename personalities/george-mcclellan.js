@@ -13,6 +13,7 @@ const georgeMcClellan = {
     name: 'Name: George B. McClellan',
     title: 'Title: Major General of the Union Army, Former Commander of the Army of the Potomac',
     years: 'Years: 1826-1885',
+    stance: 'Political stances: Advocated for war Democrat positions, supported preserving Union without immediately ending slavery, favored negotiated peace with Confederacy.',
     characteristics: [
     'Characteristics:',
     'The original "let me just double-check ONE more thing" general',
