@@ -536,15 +536,30 @@ class ReplyOperations {
                     const contentElement = tweet.querySelector('[data-testid="tweetText"]');
 
                     if (usernameElement && contentElement) {
-                        // Get raw HTML content and decode it to preserve emojis
-                        const content = contentElement.innerHTML;
-                        const username = usernameElement.innerHTML;
+                        // Extract text content including emojis
+                        const content = Array.from(contentElement.childNodes)
+                            .map(node => {
+                                if (node.nodeType === Node.TEXT_NODE) {
+                                    return node.textContent.trim();
+                                }
+                                // For img nodes (emojis), get the alt text which contains the emoji
+                                if (node.nodeName === 'IMG' && node.alt) {
+                                    return node.alt;
+                                }
+                                // For span nodes, get their text content
+                                if (node.nodeName === 'SPAN') {
+                                    return node.textContent.trim();
+                                }
+                                return '';
+                            })
+                            .filter(text => text) // Remove empty strings
+                            .join(' '); // Join with spaces to prevent word concatenation
+
+                        const username = usernameElement.textContent;
                         
-                        // Use TextDecoder to properly handle emojis
-                        const decoder = new TextDecoder('utf-8');
                         tweets.push({
-                            username: decoder.decode(new TextEncoder().encode(username)),
-                            content: decoder.decode(new TextEncoder().encode(content))
+                            username: username,
+                            content: content
                         });
 
                         if (tweets.length >= 10) break;
