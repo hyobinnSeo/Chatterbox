@@ -20,70 +20,80 @@ const bots = [
     {
         credentials: {
             username: process.env.TWITTER_USERNAME_GEORGE_WASHINGTON,
-            password: process.env.TWITTER_PASSWORD_GEORGE_WASHINGTON
+            password: process.env.TWITTER_PASSWORD_GEORGE_WASHINGTON,
+            email: process.env.TWITTER_EMAIL_GEORGE_WASHINGTON
         },
         personality: georgeWashington
     },
     {
         credentials: {
             username: process.env.TWITTER_USERNAME_JOHN_ADAMS,
-            password: process.env.TWITTER_PASSWORD_JOHN_ADAMS
+            password: process.env.TWITTER_PASSWORD_JOHN_ADAMS,
+            email: process.env.TWITTER_EMAIL_JOHN_ADAMS
         },
         personality: johnAdams
     },
     {
         credentials: {
             username: process.env.TWITTER_USERNAME_THOMAS_JEFFERSON,
-            password: process.env.TWITTER_PASSWORD_THOMAS_JEFFERSON
+            password: process.env.TWITTER_PASSWORD_THOMAS_JEFFERSON,
+            email: process.env.TWITTER_EMAIL_THOMAS_JEFFERSON
         },
         personality: thomasJefferson
     },
     {
         credentials: {
             username: process.env.TWITTER_USERNAME_ABRAHAM_LINCOLN,
-            password: process.env.TWITTER_PASSWORD_ABRAHAM_LINCOLN
+            password: process.env.TWITTER_PASSWORD_ABRAHAM_LINCOLN,
+            email: process.env.TWITTER_EMAIL_ABRAHAM_LINCOLN
         },
         personality: abrahamLincoln
     },
     {
         credentials: {
             username: process.env.TWITTER_USERNAME_GEORGE_B_MCCLELLAN,
-            password: process.env.TWITTER_PASSWORD_GEORGE_B_MCCLELLAN
+            password: process.env.TWITTER_PASSWORD_GEORGE_B_MCCLELLAN,
+            email: process.env.TWITTER_EMAIL_GEORGE_B_MCCLELLAN
         },
         personality: georgeMcClellan
     },
     {
         credentials: {
             username: process.env.TWITTER_USERNAME_HENRY_CLAY,
-            password: process.env.TWITTER_PASSWORD_HENRY_CLAY
+            password: process.env.TWITTER_PASSWORD_HENRY_CLAY,
+            email: process.env.TWITTER_EMAIL_HENRY_CLAY
         },
         personality: henryClay
     },
     {
         credentials: {
             username: process.env.TWITTER_USERNAME_JOHN_C_CALHOUN,
-            password: process.env.TWITTER_PASSWORD_JOHN_C_CALHOUN
+            password: process.env.TWITTER_PASSWORD_JOHN_C_CALHOUN,
+            email: process.env.TWITTER_EMAIL_JOHN_C_CALHOUN
         },
         personality: johnCCalhoun
     },
     {
         credentials: {
             username: process.env.TWITTER_USERNAME_HENRY_M_JACKSON,
-            password: process.env.TWITTER_PASSWORD_HENRY_M_JACKSON
+            password: process.env.TWITTER_PASSWORD_HENRY_M_JACKSON,
+            email: process.env.TWITTER_EMAIL_HENRY_M_JACKSON
         },
         personality: henryJackson
     },
     {
         credentials: {
             username: process.env.TWITTER_USERNAME_ANDREW_JACKSON,
-            password: process.env.TWITTER_PASSWORD_ANDREW_JACKSON
+            password: process.env.TWITTER_PASSWORD_ANDREW_JACKSON,
+            email: process.env.TWITTER_EMAIL_ANDREW_JACKSON
         },
         personality: andrewJackson
     },
     {
         credentials: {
             username: process.env.TWITTER_USERNAME_FRANKLIN_PIERCE,
-            password: process.env.TWITTER_PASSWORD_FRANKLIN_PIERCE
+            password: process.env.TWITTER_PASSWORD_FRANKLIN_PIERCE,
+            email: process.env.TWITTER_EMAIL_FRANKLIN_PIERCE
         },
         personality: franklinPierce
     }
