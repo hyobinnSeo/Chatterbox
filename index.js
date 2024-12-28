@@ -12,6 +12,7 @@ const henryJackson = require('./personalities/henry-jackson');
 const andrewJackson = require('./personalities/andrew-jackson');
 const franklinPierce = require('./personalities/franklin-pierce');
 const dolleyMadison = require('./personalities/dolley-madison');
+const lucyHayes = require('./personalities/lucy-hayes');
 
 // Configure target user
 const targetUser = 'libertybelltail';
@@ -100,11 +101,19 @@ const bots = [
     },
     {
         credentials: {
-            username: process.env.tWITTER_USERNAME_DOLLEY_MADISON,
-            password: process.env.tWITTER_PASSWORD_DOLLEY_MADISON,
-            email: process.env.tWITTER_EMAIL_DOLLEY_MADISON,
+            username: process.env.TWITTER_USERNAME_DOLLEY_MADISON,
+            password: process.env.TWITTER_PASSWORD_DOLLEY_MADISON,
+            email: process.env.TWITTER_EMAIL_DOLLEY_MADISON,
         },
         personality: dolleyMadison
+    },
+    {
+        credentials: {
+            username: process.env.TWITTER_USERNAME_LUCY_HAYES,
+            password: process.env.TWITTER_PASSWORD_LUCY_HAYES,
+            email: process.env.TWITTER_EMAIL_LUCY_HAYES,
+        },
+        personality: lucyHayes
     }
 ];
 

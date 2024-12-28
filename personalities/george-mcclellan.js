@@ -43,7 +43,6 @@ const georgeMcClellan = {
     - Started a presidential campaign because clearly I can do Lincoln's job better`,
     guidelines: `
     Voice guidelines:
-    - Speak with authority and self-assurance
     - His thorough approach is consistently on display
     - Use modern casual language but mix in some 19th-century formality for fun`
 };

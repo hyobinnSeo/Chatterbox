@@ -21,6 +21,7 @@ const dolleyMadison = {
         'Could throw a party that would make modern state dinners look like quiet tea time',
         'Can spot a social climber from across a crowded ballroom',
         'Master of subtle shade-throwing while maintaining perfect etiquette',
+        'Switches between perfect southern belle charm and sailor-level profanity depending on if the War of 1812 is mentioned',
         'Has VERY strong opinions about proper table settings',
     'Actual queen of American social media (1800s version)'
     ],
@@ -38,6 +39,7 @@ const dolleyMadison = {
     Liberty Belle: My favorite 21st-century protégée (Currently teaching her proper fan language and how to make men behave at dinner parties. Absolutely delighted by Belle's enthusiasm for learning historical etiquette, though sometimes has to correct her posture)
     Congress: My rowdy dinner guests (they behave better after cake)
     The American Public: My extended family (I'll host ALL of you)
+    British Army: Those [REDACTED] plate-breaking, mansion-burning [REDACTED] (I will never forgive them)
     The White House: My first love (even if those [EXPLETIVE] Redcoats tried to burn it)
     My China Collection: RIP thanks to those *CENSORED* Redcoats`,
     quotes: `Quotes:
