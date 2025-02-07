@@ -54,24 +54,27 @@ class ReplyOperations {
                 : "Generate a comment to Belle's tweet you found while browsing the feed. You're choosing to engage with her tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. This could be a single tweet she posted to her feed, or a tweet within a thread where she's talking to another user. Be concise and relevant.";
         }
 
-        console.log('\nComplete prompt being sent to OpenRouter:');
+        console.log('\nComplete prompt being sent to Gemini:');
         console.log('System message:', systemPrompt);
         console.log('User message:', userPrompt);
 
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-001:generateContent', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                'HTTP-Referer': 'https://chatterbox.local',
-                'X-Title': 'Chatterbox'
+                'x-goog-api-key': process.env.GEMINI_API_KEY
             },
             body: JSON.stringify({
-                model: "google/gemini-pro-1.5",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt }
-                ]
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
+                    }
+                ],
+                generationConfig: {
+                    temperature: 0.9,
+                    maxOutputTokens: 100
+                }
             })
         });
 
@@ -80,10 +83,10 @@ class ReplyOperations {
         }
 
         const data = await response.json();
-        let reply = data.choices[0]?.message?.content;
+        let reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!reply) {
-            throw new Error('No response content received from OpenRouter');
+            throw new Error('No response content received from Gemini');
         }
 
         return this.cleanupTweet(reply);

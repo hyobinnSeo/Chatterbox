@@ -10,7 +10,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.4.7",
     "node-cron": "^3.0.3",
     "openai": "^4.73.1",
     "puppeteer": "^23.9.0"
