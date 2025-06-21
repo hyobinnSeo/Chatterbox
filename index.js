@@ -154,8 +154,8 @@ async function runAllBots() {
                 await twitterBot.run();
                 
                 // Add random delay between bots (1-5 minutes) to avoid suspicious activity
-                const delay = Math.floor(Math.random() * (300000 - 60000) + 60000);
-                await new Promise(resolve => setTimeout(resolve, delay));
+                // const delay = Math.floor(Math.random() * (300000 - 60000) + 60000);
+                // await new Promise(resolve => setTimeout(resolve, delay));
             } catch (error) {
                 console.error(`Error running ${bot.personality.name} bot:`, error);
                 // Continue with next bot instead of stopping the entire cycle

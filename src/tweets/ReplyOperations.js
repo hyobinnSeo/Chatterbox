@@ -40,7 +40,8 @@ class ReplyOperations {
             this.personality.quotes + '\n' +
             this.personality.guidelines + '\n' +
             `Thread context:\n${threadPrompt}\n` +
-            "IMPORTANT: Keep your tweet under 280 characters. Don't use @, hashtags, or emojis. Simply write the tweet content.";
+            "IMPORTANT: Keep your tweet under 280 bytes. Don't use @, hashtags, or emojis. Simply write the tweet content." +
+            "\nIMPORTANT: 트윗은 한국어로 작성하세요.";
 
         // Different user prompts based on context and whether target is bot or user
         let userPrompt;
@@ -58,7 +59,7 @@ class ReplyOperations {
         console.log('System message:', systemPrompt);
         console.log('User message:', userPrompt);
 
-            const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-001:generateContent', {
+            const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -73,7 +74,7 @@ class ReplyOperations {
                 ],
                 generationConfig: {
                     temperature: 0.9,
-                    maxOutputTokens: 200
+                    maxOutputTokens: 4000
                 }
             })
         });
@@ -90,11 +91,40 @@ class ReplyOperations {
         const data = await response.json();
         console.log('Full API response:', JSON.stringify(data, null, 2));
         
-        let reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        // Check for thinking vs regular response structure
+        let reply = null;
+        const candidate = data.candidates?.[0];
+        
+        if (candidate?.content?.parts?.[0]?.text) {
+            // Standard response format
+            reply = candidate.content.parts[0].text;
+        } else if (candidate?.content?.parts) {
+            // Look for text in any part
+            for (const part of candidate.content.parts) {
+                if (part.text) {
+                    reply = part.text;
+                    break;
+                }
+            }
+        } else if (candidate?.content?.text) {
+            // Alternative structure
+            reply = candidate.content.text;
+        }
+        
+        // If still no reply, try to extract from thinking process
+        if (!reply && data.usageMetadata?.thoughtsTokenCount > 0) {
+            console.log('Looking for content after thinking process...');
+            // Check if there are multiple parts or hidden content
+            if (candidate?.content?.role === 'model' && candidate.finishReason !== 'MAX_TOKENS') {
+                // Check for alternative content structures
+                console.log('Full candidate content:', JSON.stringify(candidate.content, null, 2));
+            }
+        }
 
         if (!reply) {
             console.log('No reply found in response. Checking for other content...');
             console.log('Candidates:', data.candidates);
+            console.log('Usage metadata:', data.usageMetadata);
             console.log('Prompt feedback:', data.promptFeedback);
             throw new Error('No response content received from Gemini');
         }
@@ -151,6 +181,39 @@ class ReplyOperations {
 
             // Get tweets from timeline
             const timelineTweets = await this.page.evaluate(async (otherBotUsernames) => {
+                // Helper function to extract tweet content including quoted tweets
+                function extractTweetContent(tweetElement) {
+                    const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
+                    if (!contentElement) return '';
+                    
+                    let tweetContent = contentElement.textContent;
+                    
+                    // Try multiple approaches to find quoted tweets
+                    const allTweetTexts = tweetElement.querySelectorAll('[data-testid="tweetText"]');
+                    if (allTweetTexts.length > 1) {
+                        // If there are multiple tweetText elements, the second one is likely the quoted tweet
+                        for (let i = 1; i < allTweetTexts.length; i++) {
+                            const additionalText = allTweetTexts[i].textContent;
+                            if (additionalText && additionalText !== tweetContent && !tweetContent.includes(additionalText)) {
+                                tweetContent += `\n\n[Quoted tweet] ${additionalText}`;
+                            }
+                        }
+                    }
+                    
+                    // Also try looking for any nested article elements which might contain quoted content
+                    const nestedArticles = tweetElement.querySelectorAll('article');
+                    if (nestedArticles.length > 1) {
+                        for (let i = 1; i < nestedArticles.length; i++) {
+                            const nestedText = nestedArticles[i].querySelector('[data-testid="tweetText"]');
+                            if (nestedText && nestedText.textContent !== tweetContent && !tweetContent.includes(nestedText.textContent)) {
+                                tweetContent += `\n\n[Quoted tweet] ${nestedText.textContent}`;
+                            }
+                        }
+                    }
+                    
+                    return tweetContent;
+                }
+
                 const tweets = [];
                 let attempts = 0;
                 const maxAttempts = 5;
@@ -161,11 +224,10 @@ class ReplyOperations {
                     for (const tweet of tweetElements) {
                         try {
                             const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                            const contentElement = tweet.querySelector('[data-testid="tweetText"]');
                             const timeElement = tweet.querySelector('time');
                             
                             // Add null checks for all elements
-                            if (!usernameElement || !contentElement || !timeElement) {
+                            if (!usernameElement || !timeElement) {
                                 continue;
                             }
 
@@ -182,12 +244,16 @@ class ReplyOperations {
                             const username = usernameElement.innerText;
                             // Check if this tweet is from one of our other bots
                             if (otherBotUsernames.some(botUsername => username.includes(botUsername))) {
-                                tweets.push({
-                                    username: username,
-                                    content: contentElement.innerText,
-                                    tweetUrl
-                                });
-                                if (tweets.length >= 10) break;
+                                // Use helper function that includes quoted tweet content
+                                const tweetContent = extractTweetContent(tweet);
+                                if (tweetContent) {
+                                    tweets.push({
+                                        username: username,
+                                        content: tweetContent,
+                                        tweetUrl
+                                    });
+                                    if (tweets.length >= 10) break;
+                                }
                             }
                         } catch (err) {
                             console.error('Error processing tweet:', err);
@@ -241,24 +307,42 @@ class ReplyOperations {
             let processedTweets = new Set(); // Keep track of processed tweets
     
             while (hasMoreTweetsToProcess) {
-                // Find all tweets and store their data
+                                // Find all tweets and store their data
                 const targetTweetsData = await this.page.evaluate((username, processedUrls) => {
+                    // Helper function to extract tweet content including quoted tweets
+                    function extractTweetContent(tweetElement) {
+                        const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
+                        if (!contentElement) return '';
+                        
+                        let tweetContent = contentElement.textContent;
+                        
+                        // Check for quoted tweet and append its content
+                        const quotedTweet = tweetElement.querySelector('[data-testid="quoteTweet"] [data-testid="tweetText"]');
+                        if (quotedTweet) {
+                            const quotedUsername = tweetElement.querySelector('[data-testid="quoteTweet"] [data-testid="User-Name"]')?.textContent || '';
+                            tweetContent += `\n\n[인용: ${quotedUsername}] ${quotedTweet.textContent}`;
+                        }
+                        
+                        return tweetContent;
+                    }
+
                     const notifications = document.querySelectorAll('[data-testid="tweet"]');
                     const tweets = [];
-    
+
                     for (const notification of notifications) {
                         const usernameElement = notification.querySelector('[data-testid="User-Name"]');
                         if (usernameElement && usernameElement.innerText.includes(`@${username}`)) {
-                            const contentElement = notification.querySelector('[data-testid="tweetText"]');
-    
-                            if (contentElement) {
+                            // Use helper function that includes quoted tweet content
+                            const tweetContent = extractTweetContent(notification);
+
+                            if (tweetContent) {
                                 const timeLink = notification.querySelector('time').parentElement;
                                 const tweetUrl = timeLink ? timeLink.getAttribute('href') : null;
-    
+
                                 // Only add if we haven't processed this tweet before
                                 if (tweetUrl && !processedUrls.includes(tweetUrl)) {
                                     tweets.push({
-                                        content: contentElement.innerText,
+                                        content: tweetContent,
                                         tweetUrl,
                                     });
                                 }
@@ -318,19 +402,35 @@ class ReplyOperations {
             // Filter out current bot's username
             const otherBotUsernames = this.allBotUsernames.filter(username => username !== this.currentUsername);
     
-            // Find all unreplied bot notifications
+                        // Find all unreplied bot notifications
             const botNotifications = await this.page.evaluate(async (otherBotUsernames) => {
+                // Helper function to extract tweet content including quoted tweets
+                function extractTweetContent(tweetElement) {
+                    const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
+                    if (!contentElement) return '';
+                    
+                    let tweetContent = contentElement.textContent;
+                    
+                    // Check for quoted tweet and append its content
+                    const quotedTweet = tweetElement.querySelector('[data-testid="quoteTweet"] [data-testid="tweetText"]');
+                    if (quotedTweet) {
+                        const quotedUsername = tweetElement.querySelector('[data-testid="quoteTweet"] [data-testid="User-Name"]')?.textContent || '';
+                        tweetContent += `\n\n[Quoted: ${quotedUsername}] ${quotedTweet.textContent}`;
+                    }
+                    
+                    return tweetContent;
+                }
+
                 const notifications = document.querySelectorAll('[data-testid="tweet"]');
                 const botTweets = [];
-    
+
                 for (const notification of notifications) {
                     try {
                         const usernameElement = notification.querySelector('[data-testid="User-Name"]');
-                        const contentElement = notification.querySelector('[data-testid="tweetText"]');
                         const timeElement = notification.querySelector('time');
                         
                         // Add null checks for all elements
-                        if (!usernameElement || !contentElement || !timeElement) {
+                        if (!usernameElement || !timeElement) {
                             continue;
                         }
 
@@ -342,7 +442,7 @@ class ReplyOperations {
                         
                         const replyCount = notification.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
                         const hasReplies = replyCount && parseInt(replyCount.innerText) > 0;
-    
+
                         if (hasReplies) {
                             continue;
                         }
@@ -357,11 +457,15 @@ class ReplyOperations {
                             continue;
                         }
 
-                        botTweets.push({
-                            username: usernameElement.innerText,
-                            content: contentElement.innerText,
-                            tweetUrl
-                        });
+                        // Use helper function that includes quoted tweet content
+                        const tweetContent = extractTweetContent(notification);
+                        if (tweetContent) {
+                            botTweets.push({
+                                username: usernameElement.innerText,
+                                content: tweetContent,
+                                tweetUrl
+                            });
+                        }
                     } catch (err) {
                         console.error('Error processing notification:', err);
                         continue;
@@ -424,26 +528,44 @@ class ReplyOperations {
         try {
             console.log(`${this.personality.name}: Looking for tweets from @${targetUsername}...`);
     
-            // Find all suitable tweets from the specific user
+                        // Find all suitable tweets from the specific user
             const targetTweetsData = await this.page.evaluate((username) => {
+                // Helper function to extract tweet content including quoted tweets
+                function extractTweetContent(tweetElement) {
+                    const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
+                    if (!contentElement) return '';
+                    
+                    let tweetContent = contentElement.textContent;
+                    
+                    // Check for quoted tweet and append its content
+                    const quotedTweet = tweetElement.querySelector('[data-testid="quoteTweet"] [data-testid="tweetText"]');
+                    if (quotedTweet) {
+                        const quotedUsername = tweetElement.querySelector('[data-testid="quoteTweet"] [data-testid="User-Name"]')?.textContent || '';
+                        tweetContent += `\n\n[Quoted: ${quotedUsername}] ${quotedTweet.textContent}`;
+                    }
+                    
+                    return tweetContent;
+                }
+
                 const tweets = document.querySelectorAll('[data-testid="tweet"]');
                 const suitableTweets = [];
                 
                 for (const tweet of tweets) {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
                     if (usernameElement && usernameElement.innerText.includes(`@${username}`)) {
-                        const contentElement = tweet.querySelector('[data-testid="tweetText"]');
                         const replyCount = tweet.querySelector('[data-testid="reply"] [data-testid="app-text-transition-container"]');
                         const replyNumber = replyCount ? parseInt(replyCount.innerText) : 0;
                         const hasTooManyReplies = replyNumber >= 3;
-    
-                        if (contentElement && !hasTooManyReplies) {
+
+                        // Use helper function that includes quoted tweet content
+                        const tweetContent = extractTweetContent(tweet);
+                        if (tweetContent && !hasTooManyReplies) {
                             const timeLink = tweet.querySelector('time').parentElement;
                             const tweetUrl = timeLink ? timeLink.getAttribute('href') : null;
-    
+
                             if (tweetUrl) {
                                 suitableTweets.push({
-                                    content: contentElement.innerText,
+                                    content: tweetContent,
                                     tweetUrl,
                                 });
                             }
@@ -549,8 +671,8 @@ class ReplyOperations {
                     const contentElement = tweet.querySelector('[data-testid="tweetText"]');
 
                     if (usernameElement && contentElement) {
-                        // Extract text content including emojis
-                        const content = Array.from(contentElement.childNodes)
+                        // Extract text content including emojis for main tweet
+                        let content = Array.from(contentElement.childNodes)
                             .map(node => {
                                 if (node.nodeType === Node.TEXT_NODE) {
                                     return node.textContent.trim();
@@ -567,6 +689,62 @@ class ReplyOperations {
                             })
                             .filter(text => text) // Remove empty strings
                             .join(' '); // Join with spaces to prevent word concatenation
+
+                        // Try multiple approaches to find quoted tweets
+                        const allTweetTexts = tweet.querySelectorAll('[data-testid="tweetText"]');
+                        if (allTweetTexts.length > 1) {
+                            // If there are multiple tweetText elements, the second one is likely the quoted tweet
+                            for (let i = 1; i < allTweetTexts.length; i++) {
+                                const quotedContent = Array.from(allTweetTexts[i].childNodes)
+                                    .map(node => {
+                                        if (node.nodeType === Node.TEXT_NODE) {
+                                            return node.textContent.trim();
+                                        }
+                                        if (node.nodeName === 'IMG' && node.alt) {
+                                            return node.alt;
+                                        }
+                                        if (node.nodeName === 'SPAN') {
+                                            return node.textContent.trim();
+                                        }
+                                        return '';
+                                    })
+                                    .filter(text => text)
+                                    .join(' ');
+                                    
+                                if (quotedContent && quotedContent !== content && !content.includes(quotedContent)) {
+                                    content += `\n\n[Quoted tweet] ${quotedContent}`;
+                                }
+                            }
+                        }
+                        
+                        // Also try looking for nested articles
+                        const nestedArticles = tweet.querySelectorAll('article');
+                        if (nestedArticles.length > 1) {
+                            for (let i = 1; i < nestedArticles.length; i++) {
+                                const nestedText = nestedArticles[i].querySelector('[data-testid="tweetText"]');
+                                if (nestedText) {
+                                    const quotedContent = Array.from(nestedText.childNodes)
+                                        .map(node => {
+                                            if (node.nodeType === Node.TEXT_NODE) {
+                                                return node.textContent.trim();
+                                            }
+                                            if (node.nodeName === 'IMG' && node.alt) {
+                                                return node.alt;
+                                            }
+                                            if (node.nodeName === 'SPAN') {
+                                                return node.textContent.trim();
+                                            }
+                                            return '';
+                                        })
+                                        .filter(text => text)
+                                        .join(' ');
+                                        
+                                    if (quotedContent && quotedContent !== content && !content.includes(quotedContent)) {
+                                        content += `\n\n[Quoted tweet] ${quotedContent}`;
+                                    }
+                                }
+                            }
+                        }
 
                         const username = usernameElement.textContent;
                         
@@ -629,12 +807,151 @@ class ReplyOperations {
         // Clean up any double spaces created by removals
         tweet = tweet.replace(/\s+/g, ' ').trim();
 
-        // Enforce character limit
-        if (tweet.length > 280) {
-            tweet = tweet.slice(0, 276) + "...";
-        }
+        // Enforce byte limit (280 bytes)
+        tweet = this.truncateByByteLength(tweet, 280);
 
         return tweet;
+    }
+
+    // Calculate byte length considering Korean characters as 2 bytes and English as 1 byte
+    calculateByteLength(text) {
+        let byteLength = 0;
+        for (let i = 0; i < text.length; i++) {
+            const char = text.charAt(i);
+            const charCode = char.charCodeAt(0);
+            
+            // Korean characters (Hangul syllables: U+AC00 to U+D7AF)
+            // Korean Jamo (U+1100 to U+11FF, U+3130 to U+318F, U+A960 to U+A97F)
+            // Other CJK characters and symbols
+            if ((charCode >= 0xAC00 && charCode <= 0xD7AF) || // Hangul syllables
+                (charCode >= 0x1100 && charCode <= 0x11FF) || // Hangul Jamo
+                (charCode >= 0x3130 && charCode <= 0x318F) || // Hangul Compatibility Jamo
+                (charCode >= 0xA960 && charCode <= 0xA97F) || // Hangul Jamo Extended-A
+                (charCode >= 0x3400 && charCode <= 0x4DBF) || // CJK Extension A
+                (charCode >= 0x4E00 && charCode <= 0x9FFF) || // CJK Unified Ideographs
+                (charCode >= 0xF900 && charCode <= 0xFAFF) || // CJK Compatibility Ideographs
+                (charCode >= 0x2E80 && charCode <= 0x2EFF) || // CJK Radicals Supplement
+                (charCode >= 0x2F00 && charCode <= 0x2FDF) || // Kangxi Radicals
+                (charCode >= 0x31C0 && charCode <= 0x31EF) || // CJK Strokes
+                (charCode >= 0x3200 && charCode <= 0x32FF) || // Enclosed CJK Letters and Months
+                (charCode >= 0x3300 && charCode <= 0x33FF) || // CJK Compatibility
+                (charCode >= 0xFE30 && charCode <= 0xFE4F) || // CJK Compatibility Forms
+                (charCode >= 0xFF00 && charCode <= 0xFFEF)) { // Halfwidth and Fullwidth Forms
+                byteLength += 2;
+            } else {
+                byteLength += 1;
+            }
+        }
+        return byteLength;
+    }
+
+    // Truncate text to fit within specified byte limit
+    truncateByByteLength(text, maxBytes) {
+        if (this.calculateByteLength(text) <= maxBytes) {
+            return text;
+        }
+
+        let truncated = '';
+        let currentBytes = 0;
+        
+        for (let i = 0; i < text.length; i++) {
+            const char = text.charAt(i);
+            const charCode = char.charCodeAt(0);
+            
+            // Calculate bytes for this character
+            let charBytes = 1;
+            if ((charCode >= 0xAC00 && charCode <= 0xD7AF) || // Hangul syllables
+                (charCode >= 0x1100 && charCode <= 0x11FF) || // Hangul Jamo
+                (charCode >= 0x3130 && charCode <= 0x318F) || // Hangul Compatibility Jamo
+                (charCode >= 0xA960 && charCode <= 0xA97F) || // Hangul Jamo Extended-A
+                (charCode >= 0x3400 && charCode <= 0x4DBF) || // CJK Extension A
+                (charCode >= 0x4E00 && charCode <= 0x9FFF) || // CJK Unified Ideographs
+                (charCode >= 0xF900 && charCode <= 0xFAFF) || // CJK Compatibility Ideographs
+                (charCode >= 0x2E80 && charCode <= 0x2EFF) || // CJK Radicals Supplement
+                (charCode >= 0x2F00 && charCode <= 0x2FDF) || // Kangxi Radicals
+                (charCode >= 0x31C0 && charCode <= 0x31EF) || // CJK Strokes
+                (charCode >= 0x3200 && charCode <= 0x32FF) || // Enclosed CJK Letters and Months
+                (charCode >= 0x3300 && charCode <= 0x33FF) || // CJK Compatibility
+                (charCode >= 0xFE30 && charCode <= 0xFE4F) || // CJK Compatibility Forms
+                (charCode >= 0xFF00 && charCode <= 0xFFEF)) { // Halfwidth and Fullwidth Forms
+                charBytes = 2;
+            }
+            
+            // Check if adding this character would exceed the limit
+            if (currentBytes + charBytes > maxBytes) {
+                // If we can't even fit "...", just return what we have
+                if (currentBytes + 3 > maxBytes) {
+                    break;
+                }
+                // Add "..." and break
+                truncated += "...";
+                break;
+            }
+            
+            truncated += char;
+            currentBytes += charBytes;
+        }
+        
+        return truncated;
+    }
+
+    // Helper function to extract full tweet content including quoted tweets
+    extractTweetContent(tweetElement) {
+        const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
+        if (!contentElement) return '';
+        
+        let tweetContent = contentElement.textContent;
+        
+        // Try multiple possible selectors for quoted tweets
+        const quotedTweetSelectors = [
+            '[data-testid="quoteTweet"] [data-testid="tweetText"]',
+            '[role="blockquote"] [data-testid="tweetText"]',
+            '[data-testid="quoteTweet"] [lang]',
+            'article[role="article"] [data-testid="tweetText"]',
+            '.r-1tl8opc [data-testid="tweetText"]',  // CSS class that might be used
+            '[data-testid="tweet"] [data-testid="tweetText"]'  // Nested tweet structure
+        ];
+        
+        for (const selector of quotedTweetSelectors) {
+            const quotedTweets = tweetElement.querySelectorAll(selector);
+            // Skip the first one as it's likely the main tweet
+            if (quotedTweets.length > 1) {
+                const quotedTweet = quotedTweets[1];
+                if (quotedTweet && quotedTweet.textContent !== tweetContent) {
+                    // Try to find the username for the quoted tweet
+                    let quotedUsername = '';
+                    const usernameSelectors = [
+                        '[data-testid="quoteTweet"] [data-testid="User-Name"]',
+                        '[role="blockquote"] [data-testid="User-Name"]',
+                        '[data-testid="quoteTweet"] a[role="link"]'
+                    ];
+                    
+                    for (const userSelector of usernameSelectors) {
+                        const userElement = tweetElement.querySelector(userSelector);
+                        if (userElement) {
+                            quotedUsername = userElement.textContent;
+                            break;
+                        }
+                    }
+                    
+                    tweetContent += `\n\n[Quoted: ${quotedUsername}] ${quotedTweet.textContent}`;
+                    break;
+                }
+            }
+        }
+        
+        // Alternative approach: look for any additional tweet text within the same element
+        const allTweetTexts = tweetElement.querySelectorAll('[data-testid="tweetText"]');
+        if (allTweetTexts.length > 1) {
+            for (let i = 1; i < allTweetTexts.length; i++) {
+                const additionalText = allTweetTexts[i].textContent;
+                if (additionalText && additionalText !== tweetContent && !tweetContent.includes(additionalText)) {
+                    tweetContent += `\n\n[Quoted tweet] ${additionalText}`;
+                }
+            }
+        }
+        
+        return tweetContent;
     }
 }
 

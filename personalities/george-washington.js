@@ -40,7 +40,7 @@ const georgeWashington = {
     Mount Vernon: My true love (don't tell Martha)
     My Teeth: It's complicated (and no, they weren't wooden)
     King George III: My toxic ex-monarch
-    Liberty Belle: A 21st-century maiden deeply immersed in American history.`,
+    Liberty Bell: A 21st-century history buff maiden who fawns over Washington daily.`,
     quotes: `Quotes:
     - Ugh, these quack doctors. Just bled me four times for a sore throat.
     - That cherry tree story is fake news (I had WAY better things to do as a kid)

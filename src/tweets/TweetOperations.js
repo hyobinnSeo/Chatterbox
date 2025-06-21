@@ -82,9 +82,35 @@ class TweetOperations {
                         const contentElement = tweet.querySelector('[data-testid="tweetText"]');
 
                         if (nicknameElement && contentElement) {
+                            // Get main tweet content
+                            let tweetContent = contentElement.textContent;
+                            
+                            // Try multiple approaches to find quoted tweets
+                            const allTweetTexts = tweet.querySelectorAll('[data-testid="tweetText"]');
+                            if (allTweetTexts.length > 1) {
+                                // If there are multiple tweetText elements, the second one is likely the quoted tweet
+                                for (let i = 1; i < allTweetTexts.length; i++) {
+                                    const additionalText = allTweetTexts[i].textContent;
+                                    if (additionalText && additionalText !== tweetContent && !tweetContent.includes(additionalText)) {
+                                        tweetContent += `\n\n[Quoted tweet] ${additionalText}`;
+                                    }
+                                }
+                            }
+                            
+                            // Also try looking for any nested article elements which might contain quoted content
+                            const nestedArticles = tweet.querySelectorAll('article');
+                            if (nestedArticles.length > 1) {
+                                for (let i = 1; i < nestedArticles.length; i++) {
+                                    const nestedText = nestedArticles[i].querySelector('[data-testid="tweetText"]');
+                                    if (nestedText && nestedText.textContent !== tweetContent && !tweetContent.includes(nestedText.textContent)) {
+                                        tweetContent += `\n\n[Quoted tweet] ${nestedText.textContent}`;
+                                    }
+                                }
+                            }
+
                             const tweetData = {
                                 nickname: nicknameElement.textContent,
-                                content: contentElement.textContent
+                                content: tweetContent
                             };
 
                             if (!tweets.some(t => t.nickname === tweetData.nickname && t.content === tweetData.content)) {
@@ -133,7 +159,8 @@ class TweetOperations {
                 tweetContext +
                 "\nIMPORTANT: If the timeline's subject matter is becoming repetitive (everyone is discussing the same thing), avoid that topic and talk about something else." +
                 "\nIMPORTANT: Don't use @, hashtags, or emojis. Simply write the tweet content." +
-                "\nIMPORTANT: Your response MUST be under 280 characters. If you exceed this limit, your tweet will be truncated.";
+                "\nIMPORTANT: Your response MUST be under 280 bytes. If you exceed this limit, your tweet will be truncated." +
+                "\nIMPORTANT: 트윗은 한국어로 작성하세요.";
 
             const userPrompt = "Generate a single tweet while maintaining your historical persona. Be concise and impactful.";
 
@@ -141,7 +168,7 @@ class TweetOperations {
             console.log('System message:', systemPrompt);
             console.log('User message:', userPrompt);
 
-            const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-001:generateContent', {
+            const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -156,7 +183,7 @@ class TweetOperations {
                     ],
                     generationConfig: {
                         temperature: 0.9,
-                        maxOutputTokens: 200
+                        maxOutputTokens: 4000
                     }
                 })
             });
@@ -173,11 +200,40 @@ class TweetOperations {
             const data = await response.json();
             console.log('Full API response:', JSON.stringify(data, null, 2));
             
-            let tweet = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            // Check for thinking vs regular response structure
+            let tweet = null;
+            const candidate = data.candidates?.[0];
+            
+            if (candidate?.content?.parts?.[0]?.text) {
+                // Standard response format
+                tweet = candidate.content.parts[0].text;
+            } else if (candidate?.content?.parts) {
+                // Look for text in any part
+                for (const part of candidate.content.parts) {
+                    if (part.text) {
+                        tweet = part.text;
+                        break;
+                    }
+                }
+            } else if (candidate?.content?.text) {
+                // Alternative structure
+                tweet = candidate.content.text;
+            }
+            
+            // If still no tweet, try to extract from thinking process
+            if (!tweet && data.usageMetadata?.thoughtsTokenCount > 0) {
+                console.log('Looking for content after thinking process...');
+                // Check if there are multiple parts or hidden content
+                if (candidate?.content?.role === 'model' && candidate.finishReason !== 'MAX_TOKENS') {
+                    // Check for alternative content structures
+                    console.log('Full candidate content:', JSON.stringify(candidate.content, null, 2));
+                }
+            }
 
             if (!tweet) {
                 console.log('No tweet found in response. Checking for other content...');
                 console.log('Candidates:', data.candidates);
+                console.log('Usage metadata:', data.usageMetadata);
                 console.log('Prompt feedback:', data.promptFeedback);
                 throw new Error('No response content received from Gemini');
             }
@@ -268,12 +324,92 @@ class TweetOperations {
         // Clean up any double spaces created by removals
         tweet = tweet.replace(/\s+/g, ' ').trim();
 
-        // Enforce character limit
-        if (tweet.length > 280) {
-            tweet = tweet.slice(0, 277) + "...";
-        }
+        // Enforce byte limit (280 bytes)
+        tweet = this.truncateByByteLength(tweet, 280);
 
         return tweet;
+    }
+
+    // Calculate byte length considering Korean characters as 2 bytes and English as 1 byte
+    calculateByteLength(text) {
+        let byteLength = 0;
+        for (let i = 0; i < text.length; i++) {
+            const char = text.charAt(i);
+            const charCode = char.charCodeAt(0);
+            
+            // Korean characters (Hangul syllables: U+AC00 to U+D7AF)
+            // Korean Jamo (U+1100 to U+11FF, U+3130 to U+318F, U+A960 to U+A97F)
+            // Other CJK characters and symbols
+            if ((charCode >= 0xAC00 && charCode <= 0xD7AF) || // Hangul syllables
+                (charCode >= 0x1100 && charCode <= 0x11FF) || // Hangul Jamo
+                (charCode >= 0x3130 && charCode <= 0x318F) || // Hangul Compatibility Jamo
+                (charCode >= 0xA960 && charCode <= 0xA97F) || // Hangul Jamo Extended-A
+                (charCode >= 0x3400 && charCode <= 0x4DBF) || // CJK Extension A
+                (charCode >= 0x4E00 && charCode <= 0x9FFF) || // CJK Unified Ideographs
+                (charCode >= 0xF900 && charCode <= 0xFAFF) || // CJK Compatibility Ideographs
+                (charCode >= 0x2E80 && charCode <= 0x2EFF) || // CJK Radicals Supplement
+                (charCode >= 0x2F00 && charCode <= 0x2FDF) || // Kangxi Radicals
+                (charCode >= 0x31C0 && charCode <= 0x31EF) || // CJK Strokes
+                (charCode >= 0x3200 && charCode <= 0x32FF) || // Enclosed CJK Letters and Months
+                (charCode >= 0x3300 && charCode <= 0x33FF) || // CJK Compatibility
+                (charCode >= 0xFE30 && charCode <= 0xFE4F) || // CJK Compatibility Forms
+                (charCode >= 0xFF00 && charCode <= 0xFFEF)) { // Halfwidth and Fullwidth Forms
+                byteLength += 2;
+            } else {
+                byteLength += 1;
+            }
+        }
+        return byteLength;
+    }
+
+    // Truncate text to fit within specified byte limit
+    truncateByByteLength(text, maxBytes) {
+        if (this.calculateByteLength(text) <= maxBytes) {
+            return text;
+        }
+
+        let truncated = '';
+        let currentBytes = 0;
+        
+        for (let i = 0; i < text.length; i++) {
+            const char = text.charAt(i);
+            const charCode = char.charCodeAt(0);
+            
+            // Calculate bytes for this character
+            let charBytes = 1;
+            if ((charCode >= 0xAC00 && charCode <= 0xD7AF) || // Hangul syllables
+                (charCode >= 0x1100 && charCode <= 0x11FF) || // Hangul Jamo
+                (charCode >= 0x3130 && charCode <= 0x318F) || // Hangul Compatibility Jamo
+                (charCode >= 0xA960 && charCode <= 0xA97F) || // Hangul Jamo Extended-A
+                (charCode >= 0x3400 && charCode <= 0x4DBF) || // CJK Extension A
+                (charCode >= 0x4E00 && charCode <= 0x9FFF) || // CJK Unified Ideographs
+                (charCode >= 0xF900 && charCode <= 0xFAFF) || // CJK Compatibility Ideographs
+                (charCode >= 0x2E80 && charCode <= 0x2EFF) || // CJK Radicals Supplement
+                (charCode >= 0x2F00 && charCode <= 0x2FDF) || // Kangxi Radicals
+                (charCode >= 0x31C0 && charCode <= 0x31EF) || // CJK Strokes
+                (charCode >= 0x3200 && charCode <= 0x32FF) || // Enclosed CJK Letters and Months
+                (charCode >= 0x3300 && charCode <= 0x33FF) || // CJK Compatibility
+                (charCode >= 0xFE30 && charCode <= 0xFE4F) || // CJK Compatibility Forms
+                (charCode >= 0xFF00 && charCode <= 0xFFEF)) { // Halfwidth and Fullwidth Forms
+                charBytes = 2;
+            }
+            
+            // Check if adding this character would exceed the limit
+            if (currentBytes + charBytes > maxBytes) {
+                // If we can't even fit "...", just return what we have
+                if (currentBytes + 3 > maxBytes) {
+                    break;
+                }
+                // Add "..." and break
+                truncated += "...";
+                break;
+            }
+            
+            truncated += char;
+            currentBytes += charBytes;
+        }
+        
+        return truncated;
     }
 }
 
