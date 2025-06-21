@@ -73,19 +73,29 @@ class ReplyOperations {
                 ],
                 generationConfig: {
                     temperature: 0.9,
-                    maxOutputTokens: 100
+                    maxOutputTokens: 200
                 }
             })
         });
 
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            console.log('Error response body:', errorText);
+            throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
         }
 
         const data = await response.json();
+        console.log('Full API response:', JSON.stringify(data, null, 2));
+        
         let reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!reply) {
+            console.log('No reply found in response. Checking for other content...');
+            console.log('Candidates:', data.candidates);
+            console.log('Prompt feedback:', data.promptFeedback);
             throw new Error('No response content received from Gemini');
         }
 
