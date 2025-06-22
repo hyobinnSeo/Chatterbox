@@ -222,17 +222,17 @@ class ReplyOperations {
 
         if (needsReplyModal) {
             console.log(`${this.personality.name}: Need to open reply modal first`);
-            
-            // Find and click reply on the target tweet using partial content match
+
+        // Find and click reply on the target tweet using partial content match
             const replyClicked = await this.page.evaluate((targetContent) => {
-                const tweets = document.querySelectorAll('[data-testid="tweet"]');
-                for (const tweet of tweets) {
-                    const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+            const tweets = document.querySelectorAll('[data-testid="tweet"]');
+            for (const tweet of tweets) {
+                const contentElement = tweet.querySelector('[data-testid="tweetText"]');
                     if (contentElement && contentElement.innerText.includes(targetContent.substring(0, 50))) {
-                        const replyButton = tweet.querySelector('[data-testid="reply"]');
-                        if (replyButton) {
+                    const replyButton = tweet.querySelector('[data-testid="reply"]');
+                    if (replyButton) {
                             console.log(`DEBUG: Clicking reply button for tweet: "${contentElement.innerText.substring(0, 50)}..."`);
-                            replyButton.click();
+                        replyButton.click();
                             return true;
                         }
                     }
@@ -247,8 +247,8 @@ class ReplyOperations {
                 }
                 
                 return false;
-            }, tweetData.content);
-            
+        }, tweetData.content);
+
             if (replyClicked) {
                 console.log(`${this.personality.name}: Reply button clicked, waiting for modal...`);
                 await Utilities.delay(3000);
@@ -834,13 +834,6 @@ class ReplyOperations {
             // Process each bot notification
             for (const notification of botNotifications) {
                 try {
-                    // CRITICAL: Check if we've already replied to this notification
-                    const hasReplied = await this.checkIfAlreadyReplied(notification);
-                    if (hasReplied) {
-                        console.log(`${this.personality.name}: Already replied to bot notification, skipping...`);
-                        continue;
-                    }
-                    
                     // Check thread depth before replying
                     const threadDepth = await this.getThreadDepth(notification.tweetUrl);
                     
@@ -848,6 +841,10 @@ class ReplyOperations {
                         console.log(`${this.personality.name}: Thread depth (${threadDepth}) exceeds limit, skipping...`);
                         continue;
                     }
+                    
+                    // For bot-to-bot replies from notifications, skip the already replied check
+                    // since we want to continue conversation threads up to depth 3
+                    console.log(`${this.personality.name}: Bot-to-bot notification reply - skipping already replied check, using thread depth only`);
         
                     await this.processAndReplyToTweet(notification, notification.username, true);
                     break; // Only reply to one notification per run to avoid spamming

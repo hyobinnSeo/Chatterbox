@@ -26,7 +26,7 @@ class GeminiApiClient {
                 ],
                 generationConfig: {
                     temperature: 0.9,
-                    maxOutputTokens: 4000
+                    maxOutputTokens: 8000
                 }
             })
         });
