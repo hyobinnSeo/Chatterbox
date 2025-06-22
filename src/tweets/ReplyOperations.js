@@ -187,7 +187,7 @@ class ReplyOperations {
         return TweetTextProcessor.cleanupTweet(reply);
     }
 
-    async processAndReplyToTweet(tweetData, targetUsername, isFromNotification = false) {
+    async processAndReplyToTweet(tweetData, targetUsername, isFromNotification = false, skipAlreadyRepliedCheck = false) {
         // Navigate to the specific tweet
         await this.page.evaluate(tweetUrl => {
             window.location.href = tweetUrl;
@@ -195,13 +195,17 @@ class ReplyOperations {
 
         await Utilities.delay(3000);
 
-        // CRITICAL: Check if we've already replied to this tweet
-        console.log(`${this.personality.name}: Checking for existing replies before responding...`);
-        const alreadyReplied = await this.checkIfAlreadyReplied(tweetData);
-        
-        if (alreadyReplied) {
-            console.log(`${this.personality.name}: Already replied to this tweet. Skipping to avoid duplicate.`);
-            return;
+        // Check if we've already replied to this tweet (skip for bot-to-bot notifications)
+        if (!skipAlreadyRepliedCheck) {
+            console.log(`${this.personality.name}: Checking for existing replies before responding...`);
+            const alreadyReplied = await this.checkIfAlreadyReplied(tweetData);
+            
+            if (alreadyReplied) {
+                console.log(`${this.personality.name}: Already replied to this tweet. Skipping to avoid duplicate.`);
+                return;
+            }
+        } else {
+            console.log(`${this.personality.name}: Skipping already replied check for bot-to-bot notification`);
         }
 
         // Get thread context
@@ -846,7 +850,7 @@ class ReplyOperations {
                     // since we want to continue conversation threads up to depth 3
                     console.log(`${this.personality.name}: Bot-to-bot notification reply - skipping already replied check, using thread depth only`);
         
-                    await this.processAndReplyToTweet(notification, notification.username, true);
+                    await this.processAndReplyToTweet(notification, notification.username, true, true);
                     break; // Only reply to one notification per run to avoid spamming
                 } catch (err) {
                     console.error('Error processing notification:', err);
