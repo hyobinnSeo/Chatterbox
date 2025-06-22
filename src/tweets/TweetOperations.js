@@ -70,6 +70,90 @@ class TweetOperations {
 
             // Read tweets from timeline
             this.recentTweets = await this.page.evaluate(async () => {
+                // Helper function to extract complete text including @mentions - defined inside evaluate
+                function extractFullTweetContent(element) {
+                    if (!element) return '';
+                    
+                    // Try multiple approaches to extract complete text including @mentions
+                    let text = '';
+                    
+                    // Method 1: Use innerText which preserves more content than textContent
+                    if (element.innerText) {
+                        text = element.innerText;
+                    } else if (element.textContent) {
+                        text = element.textContent;
+                    }
+                    
+                    // Method 2: If still missing @mentions, try walking through child nodes
+                    if (text && !text.includes('@')) {
+                        const walker = document.createTreeWalker(
+                            element,
+                            NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                            {
+                                acceptNode: function(node) {
+                                    // Accept text nodes and link elements (which might contain @mentions)
+                                    if (node.nodeType === Node.TEXT_NODE ||
+                                        (node.nodeType === Node.ELEMENT_NODE && 
+                                         (node.tagName === 'A' || node.tagName === 'SPAN'))) {
+                                        return NodeFilter.FILTER_ACCEPT;
+                                    }
+                                    return NodeFilter.FILTER_SKIP;
+                                }
+                            }
+                        );
+                        
+                        let fullText = '';
+                        let node;
+                        while (node = walker.nextNode()) {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                fullText += node.textContent;
+                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                // Check if this element contains @mention
+                                const href = node.getAttribute('href');
+                                if (href && href.includes('/')) {
+                                    const linkText = node.textContent;
+                                    if (linkText.startsWith('@') || href.includes('/@')) {
+                                        fullText += linkText.startsWith('@') ? linkText : '@' + linkText;
+                                    } else {
+                                        fullText += linkText;
+                                    }
+                                } else {
+                                    fullText += node.textContent;
+                                }
+                            }
+                        }
+                        
+                        if (fullText.trim()) {
+                            text = fullText;
+                        }
+                    }
+                    
+                    // Method 3: Alternative approach - check for links that might be @mentions
+                    if (!text.includes('@')) {
+                        const links = element.querySelectorAll('a[href*="/@"], a[href*="/"], span[dir="ltr"]');
+                        let reconstructedText = element.textContent || '';
+                        
+                        for (const link of links) {
+                            const href = link.getAttribute('href');
+                            const linkText = link.textContent;
+                            
+                            if (href && href.includes('/@') && !linkText.startsWith('@')) {
+                                // This is likely a @mention link  
+                                const username = href.split('/@')[1];
+                                if (username) {
+                                    reconstructedText = reconstructedText.replace(linkText, '@' + username);
+                                }
+                            }
+                        }
+                        
+                        if (reconstructedText !== (element.textContent || '')) {
+                            text = reconstructedText;
+                        }
+                    }
+                    
+                    return text.trim();
+                }
+
                 const tweets = [];
                 let attempts = 0;
                 const maxAttempts = 5;
@@ -82,17 +166,17 @@ class TweetOperations {
                         const contentElement = tweet.querySelector('[data-testid="tweetText"]');
 
                         if (nicknameElement && contentElement) {
-                            // Get main tweet content
-                            let tweetContent = contentElement.textContent;
+                            // Enhanced tweet content extraction including @mentions
+                            let tweetContent = extractFullTweetContent(contentElement);
                             
                             // Try multiple approaches to find quoted tweets
                             const allTweetTexts = tweet.querySelectorAll('[data-testid="tweetText"]');
                             if (allTweetTexts.length > 1) {
                                 // If there are multiple tweetText elements, the second one is likely the quoted tweet
                                 for (let i = 1; i < allTweetTexts.length; i++) {
-                                    const additionalText = allTweetTexts[i].textContent;
+                                    const additionalText = extractFullTweetContent(allTweetTexts[i]);
                                     if (additionalText && additionalText !== tweetContent && !tweetContent.includes(additionalText)) {
-                                        tweetContent += `\n\n[Quoted tweet] ${additionalText}`;
+                                        tweetContent += `\n\n[Quoted tweet from someone else] ${additionalText}`;
                                     }
                                 }
                             }
@@ -102,8 +186,11 @@ class TweetOperations {
                             if (nestedArticles.length > 1) {
                                 for (let i = 1; i < nestedArticles.length; i++) {
                                     const nestedText = nestedArticles[i].querySelector('[data-testid="tweetText"]');
-                                    if (nestedText && nestedText.textContent !== tweetContent && !tweetContent.includes(nestedText.textContent)) {
-                                        tweetContent += `\n\n[Quoted tweet] ${nestedText.textContent}`;
+                                    if (nestedText) {
+                                        const quotedContent = extractFullTweetContent(nestedText);
+                                        if (quotedContent && quotedContent !== tweetContent && !tweetContent.includes(quotedContent)) {
+                                            tweetContent += `\n\n[Quoted tweet from someone else] ${quotedContent}`;
+                                        }
                                     }
                                 }
                             }
@@ -410,6 +497,89 @@ class TweetOperations {
         }
         
         return truncated;
+    }
+
+    extractFullTweetContent(element) {
+        if (!element) return '';
+        
+        // Try multiple approaches to extract complete text including @mentions
+        let text = '';
+        
+        // Method 1: Use innerText which preserves more content than textContent
+        if (element.innerText) {
+            text = element.innerText;
+        } else if (element.textContent) {
+            text = element.textContent;
+        }
+        
+        // Method 2: If still missing @mentions, try walking through child nodes
+        if (text && !text.includes('@')) {
+            const walker = document.createTreeWalker(
+                element,
+                NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                {
+                    acceptNode: function(node) {
+                        // Accept text nodes and link elements (which might contain @mentions)
+                        if (node.nodeType === Node.TEXT_NODE ||
+                            (node.nodeType === Node.ELEMENT_NODE && 
+                             (node.tagName === 'A' || node.tagName === 'SPAN'))) {
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                        return NodeFilter.FILTER_SKIP;
+                    }
+                }
+            );
+            
+            let fullText = '';
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    fullText += node.textContent;
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    // Check if this element contains @mention
+                    const href = node.getAttribute('href');
+                    if (href && href.includes('/')) {
+                        const linkText = node.textContent;
+                        if (linkText.startsWith('@') || href.includes('/@')) {
+                            fullText += linkText.startsWith('@') ? linkText : '@' + linkText;
+                        } else {
+                            fullText += linkText;
+                        }
+                    } else {
+                        fullText += node.textContent;
+                    }
+                }
+            }
+            
+            if (fullText.trim()) {
+                text = fullText;
+            }
+        }
+        
+        // Method 3: Alternative approach - check for links that might be @mentions
+        if (!text.includes('@')) {
+            const links = element.querySelectorAll('a[href*="/@"], a[href*="/"], span[dir="ltr"]');
+            let reconstructedText = element.textContent || '';
+            
+            for (const link of links) {
+                const href = link.getAttribute('href');
+                const linkText = link.textContent;
+                
+                if (href && href.includes('/@') && !linkText.startsWith('@')) {
+                    // This is likely a @mention link
+                    const username = href.split('/@')[1];
+                    if (username) {
+                        reconstructedText = reconstructedText.replace(linkText, '@' + username);
+                    }
+                }
+            }
+            
+            if (reconstructedText !== (element.textContent || '')) {
+                text = reconstructedText;
+            }
+        }
+        
+        return text.trim();
     }
 }
 

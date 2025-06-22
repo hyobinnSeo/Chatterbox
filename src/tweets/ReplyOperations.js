@@ -186,16 +186,16 @@ class ReplyOperations {
                     const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
                     if (!contentElement) return '';
                     
-                    let tweetContent = contentElement.textContent;
+                    let tweetContent = extractFullTweetContent(contentElement);
                     
                     // Try multiple approaches to find quoted tweets
                     const allTweetTexts = tweetElement.querySelectorAll('[data-testid="tweetText"]');
                     if (allTweetTexts.length > 1) {
                         // If there are multiple tweetText elements, the second one is likely the quoted tweet
                         for (let i = 1; i < allTweetTexts.length; i++) {
-                            const additionalText = allTweetTexts[i].textContent;
+                            const additionalText = extractFullTweetContent(allTweetTexts[i]);
                             if (additionalText && additionalText !== tweetContent && !tweetContent.includes(additionalText)) {
-                                tweetContent += `\n\n[Quoted tweet] ${additionalText}`;
+                                tweetContent += `\n\n[Quoted tweet from someone else] ${additionalText}`;
                             }
                         }
                     }
@@ -205,13 +205,100 @@ class ReplyOperations {
                     if (nestedArticles.length > 1) {
                         for (let i = 1; i < nestedArticles.length; i++) {
                             const nestedText = nestedArticles[i].querySelector('[data-testid="tweetText"]');
-                            if (nestedText && nestedText.textContent !== tweetContent && !tweetContent.includes(nestedText.textContent)) {
-                                tweetContent += `\n\n[Quoted tweet] ${nestedText.textContent}`;
+                            if (nestedText) {
+                                const quotedContent = extractFullTweetContent(nestedText);
+                                if (quotedContent && quotedContent !== tweetContent && !tweetContent.includes(quotedContent)) {
+                                    tweetContent += `\n\n[Quoted tweet from someone else] ${quotedContent}`;
+                                }
                             }
                         }
                     }
                     
                     return tweetContent;
+                }
+
+                // Helper function to extract complete text including @mentions
+                function extractFullTweetContent(element) {
+                    if (!element) return '';
+                    
+                    // Try multiple approaches to extract complete text including @mentions
+                    let text = '';
+                    
+                    // Method 1: Use innerText which preserves more content than textContent
+                    if (element.innerText) {
+                        text = element.innerText;
+                    } else if (element.textContent) {
+                        text = element.textContent;
+                    }
+                    
+                    // Method 2: If still missing @mentions, try walking through child nodes
+                    if (text && !text.includes('@')) {
+                        const walker = document.createTreeWalker(
+                            element,
+                            NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                            {
+                                acceptNode: function(node) {
+                                    // Accept text nodes and link elements (which might contain @mentions)
+                                    if (node.nodeType === Node.TEXT_NODE ||
+                                        (node.nodeType === Node.ELEMENT_NODE && 
+                                         (node.tagName === 'A' || node.tagName === 'SPAN'))) {
+                                        return NodeFilter.FILTER_ACCEPT;
+                                    }
+                                    return NodeFilter.FILTER_SKIP;
+                                }
+                            }
+                        );
+                        
+                        let fullText = '';
+                        let node;
+                        while (node = walker.nextNode()) {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                fullText += node.textContent;
+                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                // Check if this element contains @mention
+                                const href = node.getAttribute('href');
+                                if (href && href.includes('/')) {
+                                    const linkText = node.textContent;
+                                    if (linkText.startsWith('@') || href.includes('/@')) {
+                                        fullText += linkText.startsWith('@') ? linkText : '@' + linkText;
+                                    } else {
+                                        fullText += linkText;
+                                    }
+                                } else {
+                                    fullText += node.textContent;
+                                }
+                            }
+                        }
+                        
+                        if (fullText.trim()) {
+                            text = fullText;
+                        }
+                    }
+                    
+                    // Method 3: Alternative approach - check for links that might be @mentions
+                    if (!text.includes('@')) {
+                        const links = element.querySelectorAll('a[href*="/@"], a[href*="/"], span[dir="ltr"]');
+                        let reconstructedText = element.textContent || '';
+                        
+                        for (const link of links) {
+                            const href = link.getAttribute('href');
+                            const linkText = link.textContent;
+                            
+                            if (href && href.includes('/@') && !linkText.startsWith('@')) {
+                                // This is likely a @mention link
+                                const username = href.split('/@')[1];
+                                if (username) {
+                                    reconstructedText = reconstructedText.replace(linkText, '@' + username);
+                                }
+                            }
+                        }
+                        
+                        if (reconstructedText !== (element.textContent || '')) {
+                            text = reconstructedText;
+                        }
+                    }
+                    
+                    return text.trim();
                 }
 
                 const tweets = [];
@@ -314,7 +401,7 @@ class ReplyOperations {
                         const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
                         if (!contentElement) return '';
                         
-                        let tweetContent = contentElement.textContent;
+                        let tweetContent = extractFullTweetContent(contentElement);
                         
                         // Check for quoted tweet and append its content
                         const quotedTweet = tweetElement.querySelector('[data-testid="quoteTweet"] [data-testid="tweetText"]');
@@ -324,6 +411,90 @@ class ReplyOperations {
                         }
                         
                         return tweetContent;
+                    }
+
+                    // Helper function to extract complete text including @mentions
+                    function extractFullTweetContent(element) {
+                        if (!element) return '';
+                        
+                        // Try multiple approaches to extract complete text including @mentions
+                        let text = '';
+                        
+                        // Method 1: Use innerText which preserves more content than textContent
+                        if (element.innerText) {
+                            text = element.innerText;
+                        } else if (element.textContent) {
+                            text = element.textContent;
+                        }
+                        
+                        // Method 2: If still missing @mentions, try walking through child nodes
+                        if (text && !text.includes('@')) {
+                            const walker = document.createTreeWalker(
+                                element,
+                                NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                                {
+                                    acceptNode: function(node) {
+                                        // Accept text nodes and link elements (which might contain @mentions)
+                                        if (node.nodeType === Node.TEXT_NODE ||
+                                            (node.nodeType === Node.ELEMENT_NODE && 
+                                             (node.tagName === 'A' || node.tagName === 'SPAN'))) {
+                                            return NodeFilter.FILTER_ACCEPT;
+                                        }
+                                        return NodeFilter.FILTER_SKIP;
+                                    }
+                                }
+                            );
+                            
+                            let fullText = '';
+                            let node;
+                            while (node = walker.nextNode()) {
+                                if (node.nodeType === Node.TEXT_NODE) {
+                                    fullText += node.textContent;
+                                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                    // Check if this element contains @mention
+                                    const href = node.getAttribute('href');
+                                    if (href && href.includes('/')) {
+                                        const linkText = node.textContent;
+                                        if (linkText.startsWith('@') || href.includes('/@')) {
+                                            fullText += linkText.startsWith('@') ? linkText : '@' + linkText;
+                                        } else {
+                                            fullText += linkText;
+                                        }
+                                    } else {
+                                        fullText += node.textContent;
+                                    }
+                                }
+                            }
+                            
+                            if (fullText.trim()) {
+                                text = fullText;
+                            }
+                        }
+                        
+                        // Method 3: Alternative approach - check for links that might be @mentions
+                        if (!text.includes('@')) {
+                            const links = element.querySelectorAll('a[href*="/@"], a[href*="/"], span[dir="ltr"]');
+                            let reconstructedText = element.textContent || '';
+                            
+                            for (const link of links) {
+                                const href = link.getAttribute('href');
+                                const linkText = link.textContent;
+                                
+                                if (href && href.includes('/@') && !linkText.startsWith('@')) {
+                                    // This is likely a @mention link
+                                    const username = href.split('/@')[1];
+                                    if (username) {
+                                        reconstructedText = reconstructedText.replace(linkText, '@' + username);
+                                    }
+                                }
+                            }
+                            
+                            if (reconstructedText !== (element.textContent || '')) {
+                                text = reconstructedText;
+                            }
+                        }
+                        
+                        return text.trim();
                     }
 
                     const notifications = document.querySelectorAll('[data-testid="tweet"]');
@@ -409,7 +580,7 @@ class ReplyOperations {
                     const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
                     if (!contentElement) return '';
                     
-                    let tweetContent = contentElement.textContent;
+                    let tweetContent = extractFullTweetContent(contentElement);
                     
                     // Check for quoted tweet and append its content
                     const quotedTweet = tweetElement.querySelector('[data-testid="quoteTweet"] [data-testid="tweetText"]');
@@ -419,6 +590,90 @@ class ReplyOperations {
                     }
                     
                     return tweetContent;
+                }
+
+                // Helper function to extract complete text including @mentions
+                function extractFullTweetContent(element) {
+                    if (!element) return '';
+                    
+                    // Try multiple approaches to extract complete text including @mentions
+                    let text = '';
+                    
+                    // Method 1: Use innerText which preserves more content than textContent
+                    if (element.innerText) {
+                        text = element.innerText;
+                    } else if (element.textContent) {
+                        text = element.textContent;
+                    }
+                    
+                    // Method 2: If still missing @mentions, try walking through child nodes
+                    if (text && !text.includes('@')) {
+                        const walker = document.createTreeWalker(
+                            element,
+                            NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                            {
+                                acceptNode: function(node) {
+                                    // Accept text nodes and link elements (which might contain @mentions)
+                                    if (node.nodeType === Node.TEXT_NODE ||
+                                        (node.nodeType === Node.ELEMENT_NODE && 
+                                         (node.tagName === 'A' || node.tagName === 'SPAN'))) {
+                                        return NodeFilter.FILTER_ACCEPT;
+                                    }
+                                    return NodeFilter.FILTER_SKIP;
+                                }
+                            }
+                        );
+                        
+                        let fullText = '';
+                        let node;
+                        while (node = walker.nextNode()) {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                fullText += node.textContent;
+                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                // Check if this element contains @mention
+                                const href = node.getAttribute('href');
+                                if (href && href.includes('/')) {
+                                    const linkText = node.textContent;
+                                    if (linkText.startsWith('@') || href.includes('/@')) {
+                                        fullText += linkText.startsWith('@') ? linkText : '@' + linkText;
+                                    } else {
+                                        fullText += linkText;
+                                    }
+                                } else {
+                                    fullText += node.textContent;
+                                }
+                            }
+                        }
+                        
+                        if (fullText.trim()) {
+                            text = fullText;
+                        }
+                    }
+                    
+                    // Method 3: Alternative approach - check for links that might be @mentions
+                    if (!text.includes('@')) {
+                        const links = element.querySelectorAll('a[href*="/@"], a[href*="/"], span[dir="ltr"]');
+                        let reconstructedText = element.textContent || '';
+                        
+                        for (const link of links) {
+                            const href = link.getAttribute('href');
+                            const linkText = link.textContent;
+                            
+                            if (href && href.includes('/@') && !linkText.startsWith('@')) {
+                                // This is likely a @mention link
+                                const username = href.split('/@')[1];
+                                if (username) {
+                                    reconstructedText = reconstructedText.replace(linkText, '@' + username);
+                                }
+                            }
+                        }
+                        
+                        if (reconstructedText !== (element.textContent || '')) {
+                            text = reconstructedText;
+                        }
+                    }
+                    
+                    return text.trim();
                 }
 
                 const notifications = document.querySelectorAll('[data-testid="tweet"]');
@@ -535,7 +790,7 @@ class ReplyOperations {
                     const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
                     if (!contentElement) return '';
                     
-                    let tweetContent = contentElement.textContent;
+                    let tweetContent = extractFullTweetContent(contentElement);
                     
                     // Check for quoted tweet and append its content
                     const quotedTweet = tweetElement.querySelector('[data-testid="quoteTweet"] [data-testid="tweetText"]');
@@ -545,6 +800,90 @@ class ReplyOperations {
                     }
                     
                     return tweetContent;
+                }
+
+                // Helper function to extract complete text including @mentions
+                function extractFullTweetContent(element) {
+                    if (!element) return '';
+                    
+                    // Try multiple approaches to extract complete text including @mentions
+                    let text = '';
+                    
+                    // Method 1: Use innerText which preserves more content than textContent
+                    if (element.innerText) {
+                        text = element.innerText;
+                    } else if (element.textContent) {
+                        text = element.textContent;
+                    }
+                    
+                    // Method 2: If still missing @mentions, try walking through child nodes
+                    if (text && !text.includes('@')) {
+                        const walker = document.createTreeWalker(
+                            element,
+                            NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                            {
+                                acceptNode: function(node) {
+                                    // Accept text nodes and link elements (which might contain @mentions)
+                                    if (node.nodeType === Node.TEXT_NODE ||
+                                        (node.nodeType === Node.ELEMENT_NODE && 
+                                         (node.tagName === 'A' || node.tagName === 'SPAN'))) {
+                                        return NodeFilter.FILTER_ACCEPT;
+                                    }
+                                    return NodeFilter.FILTER_SKIP;
+                                }
+                            }
+                        );
+                        
+                        let fullText = '';
+                        let node;
+                        while (node = walker.nextNode()) {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                fullText += node.textContent;
+                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                // Check if this element contains @mention
+                                const href = node.getAttribute('href');
+                                if (href && href.includes('/')) {
+                                    const linkText = node.textContent;
+                                    if (linkText.startsWith('@') || href.includes('/@')) {
+                                        fullText += linkText.startsWith('@') ? linkText : '@' + linkText;
+                                    } else {
+                                        fullText += linkText;
+                                    }
+                                } else {
+                                    fullText += node.textContent;
+                                }
+                            }
+                        }
+                        
+                        if (fullText.trim()) {
+                            text = fullText;
+                        }
+                    }
+                    
+                    // Method 3: Alternative approach - check for links that might be @mentions
+                    if (!text.includes('@')) {
+                        const links = element.querySelectorAll('a[href*="/@"], a[href*="/"], span[dir="ltr"]');
+                        let reconstructedText = element.textContent || '';
+                        
+                        for (const link of links) {
+                            const href = link.getAttribute('href');
+                            const linkText = link.textContent;
+                            
+                            if (href && href.includes('/@') && !linkText.startsWith('@')) {
+                                // This is likely a @mention link
+                                const username = href.split('/@')[1];
+                                if (username) {
+                                    reconstructedText = reconstructedText.replace(linkText, '@' + username);
+                                }
+                            }
+                        }
+                        
+                        if (reconstructedText !== (element.textContent || '')) {
+                            text = reconstructedText;
+                        }
+                    }
+                    
+                    return text.trim();
                 }
 
                 const tweets = document.querySelectorAll('[data-testid="tweet"]');
@@ -612,32 +951,133 @@ class ReplyOperations {
             // Use the bot's actual username for checking replies
             const botUsername = this.currentUsername;
 
-            // Check for bot's presence in the thread
-            const hasReply = await this.page.evaluate((botUsername, targetContent) => {
+            // Check for bot's presence in the thread with detailed debugging
+            const debugInfo = await this.page.evaluate((botUsername, targetContent, personalityName) => {
                 // Get all tweets in the thread
                 const allTweets = document.querySelectorAll('[data-testid="tweet"]');
                 const tweetsArray = Array.from(allTweets);
                 
-                // Find the target tweet's index using partial content match
-                const targetIndex = tweetsArray.findIndex(tweet => {
+                console.log(`DEBUG: Found ${tweetsArray.length} tweets in thread`);
+                console.log(`DEBUG: Looking for target content: "${targetContent.substring(0, 100)}..."`);
+                
+                // Find the target tweet's index using multiple matching strategies
+                let targetIndex = -1;
+                
+                // Strategy 1: Partial content match
+                targetIndex = tweetsArray.findIndex(tweet => {
                     const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
-                    return tweetText && tweetText.includes(targetContent);
+                    return tweetText && tweetText.includes(targetContent.substring(0, 50));
                 });
+                
+                // Strategy 2: If not found, try with just the first line
+                if (targetIndex === -1) {
+                    const firstLine = targetContent.split('\n')[0];
+                    console.log(`DEBUG: Trying first line match: "${firstLine}"`);
+                    targetIndex = tweetsArray.findIndex(tweet => {
+                        const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
+                        return tweetText && tweetText.includes(firstLine);
+                    });
+                }
+                
+                // Strategy 3: If still not found, try looking for quoted content
+                if (targetIndex === -1) {
+                    const quotedPart = targetContent.includes('[Quoted tweet from someone else]') 
+                        ? targetContent.split('[Quoted tweet from someone else]')[0].trim()
+                        : targetContent;
+                    console.log(`DEBUG: Trying quoted part match: "${quotedPart.substring(0, 50)}..."`);
+                    targetIndex = tweetsArray.findIndex(tweet => {
+                        const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
+                        return tweetText && tweetText.includes(quotedPart.substring(0, 30));
+                    });
+                }
 
-                if (targetIndex === -1) return false;
+                console.log(`DEBUG: Target tweet index: ${targetIndex}`);
+                
+                if (targetIndex === -1) {
+                    console.log('DEBUG: Target tweet not found, listing all tweet contents:');
+                    tweetsArray.forEach((tweet, i) => {
+                        const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
+                        const usernameText = tweet.querySelector('[data-testid="User-Name"]')?.innerText;
+                        console.log(`DEBUG: Tweet ${i}: User: "${usernameText}", Content: "${tweetText?.substring(0, 100)}..."`);
+                    });
+                    return { hasReply: false, targetFound: false, debugInfo: 'Target tweet not found' };
+                }
 
                 // Check all tweets in the thread after the target tweet
                 const repliesSection = tweetsArray.slice(targetIndex + 1);
+                console.log(`DEBUG: Checking ${repliesSection.length} replies after target tweet`);
                 
-                // Look for any reply from the bot using the actual username
-                return repliesSection.some(tweet => {
+                let foundBotReply = false;
+                const botReplies = [];
+                
+                // Look for any reply from the bot using multiple matching criteria
+                repliesSection.forEach((tweet, i) => {
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    return usernameElement && usernameElement.innerText.includes(botUsername);
+                    if (!usernameElement) return;
+                    
+                    const usernameText = usernameElement.innerText;
+                    const tweetContent = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
+                    
+                    console.log(`DEBUG: Reply ${i}: User: "${usernameText}", Content: "${tweetContent?.substring(0, 80)}..."`);
+                    
+                    let isMatch = false;
+                    let matchReason = '';
+                    
+                    // Multiple matching strategies:
+                    // 1. Check if username contains the bot's username
+                    if (usernameText.includes(botUsername)) {
+                        isMatch = true;
+                        matchReason = 'username contains botUsername';
+                    }
+                    
+                    // 2. Check if username contains the personality name
+                    else if (personalityName && usernameText.includes(personalityName)) {
+                        isMatch = true;
+                        matchReason = 'username contains personality name';
+                    }
+                    
+                    // 3. Check @username pattern in the text
+                    else if (usernameText.includes('@' + botUsername)) {
+                        isMatch = true;
+                        matchReason = '@username pattern match';
+                    }
+                    
+                    // 4. Extract @username from the displayed text and compare
+                    else {
+                        const atMatch = usernameText.match(/@([a-zA-Z0-9_]+)/);
+                        if (atMatch && atMatch[1] === botUsername) {
+                            isMatch = true;
+                            matchReason = 'regex @username match';
+                        }
+                    }
+                    
+                    if (isMatch) {
+                        foundBotReply = true;
+                        botReplies.push({
+                            username: usernameText,
+                            content: tweetContent?.substring(0, 100),
+                            matchReason: matchReason
+                        });
+                        console.log(`DEBUG: FOUND BOT REPLY! Reason: ${matchReason}`);
+                    }
                 });
-            }, botUsername, tweetData.content);
+                
+                console.log(`DEBUG: Bot replies found: ${botReplies.length}`);
+                
+                return { 
+                    hasReply: foundBotReply, 
+                    targetFound: true, 
+                    debugInfo: `Found ${botReplies.length} bot replies`,
+                    botReplies: botReplies
+                };
+            }, botUsername, tweetData.content, this.personality.name);
+
+            console.log(`${this.personality.name}: Debug results:`, debugInfo);
+            const hasReply = debugInfo.hasReply;
 
             const replyStatus = hasReply ? 'Found reply' : 'No reply found';
             console.log(`${this.personality.name}: Checking for existing reply - ${replyStatus}`);
+            console.log(`${this.personality.name}: Bot username: "${botUsername}", Personality name: "${this.personality.name}"`);
             
             return hasReply;
 
@@ -649,6 +1089,71 @@ class ReplyOperations {
 
     async getThreadContext() {
         return await this.page.evaluate(() => {
+            // Helper function to extract complete text including @mentions - defined inside evaluate
+            function extractFullTweetContentInContext(element) {
+                if (!element) return '';
+                
+                // Extract text content including emojis and @mentions
+                let text = '';
+                
+                // Method 1: Use innerText which preserves more content than textContent
+                if (element.innerText) {
+                    text = element.innerText;
+                } else if (element.textContent) {
+                    text = element.textContent;
+                }
+                
+                // Method 2: Walk through child nodes to capture all content including @mentions
+                if (!text.includes('@')) {
+                    const parts = [];
+                    const walker = document.createTreeWalker(
+                        element,
+                        NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                        null,
+                        false
+                    );
+                    
+                    let node;
+                    while (node = walker.nextNode()) {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            const textContent = node.textContent.trim();
+                            if (textContent) {
+                                parts.push(textContent);
+                            }
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                            if (node.nodeName === 'IMG' && node.alt) {
+                                // For emoji images, get the alt text
+                                parts.push(node.alt);
+                            } else if (node.nodeName === 'A') {
+                                // For links (potential @mentions)
+                                const href = node.getAttribute('href');
+                                const linkText = node.textContent;
+                                
+                                if (href && href.includes('/@') && !linkText.startsWith('@')) {
+                                    // This is a @mention link
+                                    const username = href.split('/@')[1]?.split('/')[0];
+                                    if (username) {
+                                        parts.push('@' + username);
+                                    } else {
+                                        parts.push(linkText);
+                                    }
+                                } else if (linkText.startsWith('@')) {
+                                    parts.push(linkText);
+                                } else {
+                                    parts.push(linkText);
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (parts.length > 0) {
+                        text = parts.join(' ');
+                    }
+                }
+                
+                return text.trim();
+            }
+
             const tweets = [];
             const threadContainers = Array.from(document.querySelectorAll('[data-testid="cellInnerDiv"]'));
             
@@ -671,48 +1176,18 @@ class ReplyOperations {
                     const contentElement = tweet.querySelector('[data-testid="tweetText"]');
 
                     if (usernameElement && contentElement) {
-                        // Extract text content including emojis for main tweet
-                        let content = Array.from(contentElement.childNodes)
-                            .map(node => {
-                                if (node.nodeType === Node.TEXT_NODE) {
-                                    return node.textContent.trim();
-                                }
-                                // For img nodes (emojis), get the alt text which contains the emoji
-                                if (node.nodeName === 'IMG' && node.alt) {
-                                    return node.alt;
-                                }
-                                // For span nodes, get their text content
-                                if (node.nodeName === 'SPAN') {
-                                    return node.textContent.trim();
-                                }
-                                return '';
-                            })
-                            .filter(text => text) // Remove empty strings
-                            .join(' '); // Join with spaces to prevent word concatenation
+                        // Extract text content including emojis and @mentions for main tweet
+                        let content = extractFullTweetContentInContext(contentElement);
 
                         // Try multiple approaches to find quoted tweets
                         const allTweetTexts = tweet.querySelectorAll('[data-testid="tweetText"]');
                         if (allTweetTexts.length > 1) {
                             // If there are multiple tweetText elements, the second one is likely the quoted tweet
                             for (let i = 1; i < allTweetTexts.length; i++) {
-                                const quotedContent = Array.from(allTweetTexts[i].childNodes)
-                                    .map(node => {
-                                        if (node.nodeType === Node.TEXT_NODE) {
-                                            return node.textContent.trim();
-                                        }
-                                        if (node.nodeName === 'IMG' && node.alt) {
-                                            return node.alt;
-                                        }
-                                        if (node.nodeName === 'SPAN') {
-                                            return node.textContent.trim();
-                                        }
-                                        return '';
-                                    })
-                                    .filter(text => text)
-                                    .join(' ');
+                                const quotedContent = extractFullTweetContentInContext(allTweetTexts[i]);
                                     
                                 if (quotedContent && quotedContent !== content && !content.includes(quotedContent)) {
-                                    content += `\n\n[Quoted tweet] ${quotedContent}`;
+                                    content += `\n\n[Quoted tweet from someone else] ${quotedContent}`;
                                 }
                             }
                         }
@@ -723,24 +1198,10 @@ class ReplyOperations {
                             for (let i = 1; i < nestedArticles.length; i++) {
                                 const nestedText = nestedArticles[i].querySelector('[data-testid="tweetText"]');
                                 if (nestedText) {
-                                    const quotedContent = Array.from(nestedText.childNodes)
-                                        .map(node => {
-                                            if (node.nodeType === Node.TEXT_NODE) {
-                                                return node.textContent.trim();
-                                            }
-                                            if (node.nodeName === 'IMG' && node.alt) {
-                                                return node.alt;
-                                            }
-                                            if (node.nodeName === 'SPAN') {
-                                                return node.textContent.trim();
-                                            }
-                                            return '';
-                                        })
-                                        .filter(text => text)
-                                        .join(' ');
+                                    const quotedContent = extractFullTweetContentInContext(nestedText);
                                         
                                     if (quotedContent && quotedContent !== content && !content.includes(quotedContent)) {
-                                        content += `\n\n[Quoted tweet] ${quotedContent}`;
+                                        content += `\n\n[Quoted tweet from someone else] ${quotedContent}`;
                                     }
                                 }
                             }
@@ -773,9 +1234,380 @@ class ReplyOperations {
         await this.page.keyboard.type(reply, { delay: 50 });
         await Utilities.delay(1000);
 
-        const replyButtonSelector = '[data-testid="tweetButton"]';
-        await this.page.waitForSelector(replyButtonSelector);
-        await this.page.click(replyButtonSelector);
+        // Detect if we're in modal or inline reply mode
+        const isModal = await this.page.evaluate(() => {
+            const modal = document.querySelector('[aria-modal="true"]');
+            const overlay = document.querySelector('[data-testid="modal-overlay"]');
+            return !!(modal || overlay);
+        });
+
+        console.log(`${this.personality.name}: Reply mode detected: ${isModal ? 'Modal' : 'Inline page'}`);
+
+        // Try multiple approaches to find and click the reply/post button
+        let buttonClicked = false;
+        
+        // Approach 1: Try standard data-testid
+        try {
+            const replyButtonSelector = '[data-testid="tweetButton"]';
+            const button = await this.page.$(replyButtonSelector);
+            if (button) {
+                await button.click();
+                buttonClicked = true;
+                console.log(`${this.personality.name}: Clicked reply button using data-testid`);
+            }
+        } catch (error) {
+            console.log(`${this.personality.name}: Standard button selector failed, trying alternatives...`);
+        }
+
+        // Approach 2: Enhanced text-based button search with click verification
+        if (!buttonClicked) {
+            try {
+                const buttonClickResult = await this.page.evaluate((isModal) => {
+                    const buttons = document.querySelectorAll('button, [role="button"]');
+                    
+                    // Define buttons to avoid (these are not reply buttons)
+                    const avoidTexts = ['Done', '완료', 'Cancel', '취소', 'Close', '닫기', 'Back', '뒤로', 'Delete', '삭제'];
+                    
+                    // Check if we're in "Replying to" modal context
+                    const isReplyingToModal = document.querySelector('[aria-labelledby="modal-header"]') && 
+                                            (document.textContent.includes('Replying to') || document.textContent.includes('답글 대상'));
+                    
+                    // For replying to modal, be very strict about Reply button only
+                    const priorityTexts = isReplyingToModal ? ['Reply', '답글'] : 
+                                        isModal ? ['Reply', '답글', 'Post', '게시하기', 'Tweet', '트윗'] : 
+                                        ['Reply', '답글', 'Post', '게시하기', 'Tweet', '트윗'];
+                    
+                    console.log(`DEBUG: Context - Modal: ${isModal}, ReplyingToModal: ${isReplyingToModal}`);
+                    
+                    for (const targetText of priorityTexts) {
+                        for (const button of buttons) {
+                            const buttonText = button.textContent?.trim();
+                            if (!buttonText) continue;
+                            
+                            // Skip buttons we want to avoid
+                            if (avoidTexts.some(avoid => buttonText.toLowerCase().includes(avoid.toLowerCase()))) {
+                                console.log(`DEBUG: Skipping avoid button: "${buttonText}"`);
+                                continue;
+                            }
+                            
+                            // Exact match first, then includes
+                            const isExactMatch = buttonText.toLowerCase() === targetText.toLowerCase();
+                            const isPartialMatch = buttonText.toLowerCase().includes(targetText.toLowerCase()) ||
+                                                 targetText.toLowerCase().includes(buttonText.toLowerCase());
+                            
+                            if (isExactMatch || isPartialMatch) {
+                                // Check if button is enabled and visible
+                                const isDisabled = button.disabled || button.getAttribute('aria-disabled') === 'true';
+                                const isVisible = button.offsetParent !== null;
+                                const rect = button.getBoundingClientRect();
+                                const isInViewport = rect.width > 0 && rect.height > 0;
+                                
+                                // Additional filtering for reply buttons
+                                const isInTopArea = rect.top < window.innerHeight * 0.4; // Top 40% of screen
+                                const isInRightArea = rect.right > window.innerWidth * 0.8; // Right 20% of screen
+                                const hasAvoidKeywords = button.getAttribute('aria-label')?.toLowerCase().includes('close') ||
+                                                       button.getAttribute('aria-label')?.toLowerCase().includes('done') ||
+                                                       button.className?.includes('close') ||
+                                                       button.className?.includes('done');
+                                
+                                // For "Replying to" modal, be extra strict
+                                if (isReplyingToModal) {
+                                    // Skip buttons in top-right area (likely "Done" button)
+                                    if (isInTopArea && isInRightArea) {
+                                        console.log(`DEBUG: Skipping top-right button in replying modal: "${buttonText}"`);
+                                        continue;
+                                    }
+                                    
+                                    // Only allow exact Reply button text in this context
+                                    if (buttonText.toLowerCase() !== 'reply' && buttonText !== '답글') {
+                                        console.log(`DEBUG: Skipping non-reply button in replying modal: "${buttonText}"`);
+                                        continue;
+                                    }
+                                }
+                                
+                                // Skip buttons in top area that might be "Done" buttons
+                                if (isInTopArea && buttonText.toLowerCase() !== 'reply' && buttonText !== '답글') {
+                                    console.log(`DEBUG: Skipping top-area button: "${buttonText}"`);
+                                    continue;
+                                }
+                                
+                                if (hasAvoidKeywords) {
+                                    console.log(`DEBUG: Skipping button with avoid keywords: "${buttonText}"`);
+                                    continue;
+                                }
+                                
+                                console.log(`DEBUG: Found valid button "${buttonText}" - Disabled: ${isDisabled}, Visible: ${isVisible}, InViewport: ${isInViewport}, Position: ${rect.top}px from top`);
+                                
+                                if (!isDisabled && isVisible && isInViewport) {
+                                    console.log(`DEBUG: Attempting to click button: "${buttonText}"`);
+                                    
+                                    // Try multiple click methods
+                                    try {
+                                        button.click();
+                                        console.log(`DEBUG: Clicked button "${buttonText}" successfully`);
+                                        return { success: true, buttonText: buttonText, method: 'click()' };
+                                    } catch (clickError) {
+                                        console.log(`DEBUG: click() failed, trying dispatchEvent`);
+                                        // Fallback: dispatch click event
+                                        const event = new MouseEvent('click', {
+                                            view: window,
+                                            bubbles: true,
+                                            cancelable: true
+                                        });
+                                        button.dispatchEvent(event);
+                                        return { success: true, buttonText: buttonText, method: 'dispatchEvent' };
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // If we found an exact match for this priority text, don't try others
+                        if (priorityTexts.indexOf(targetText) === 0) {
+                            const exactButton = Array.from(buttons).find(b => 
+                                b.textContent?.trim().toLowerCase() === targetText.toLowerCase());
+                            if (exactButton) break; // Found exact match, stop looking
+                        }
+                    }
+                    
+                    // Final attempt: Look for Reply button with specific characteristics
+                    console.log('DEBUG: Final attempt - looking for specific Reply button');
+                    for (const button of buttons) {
+                        const buttonText = button.textContent?.trim() || '';
+                        const ariaLabel = button.getAttribute('aria-label') || '';
+                        const dataTestId = button.getAttribute('data-testid') || '';
+                        const rect = button.getBoundingClientRect();
+                        
+                        // Must be enabled and visible
+                        const isDisabled = button.disabled || button.getAttribute('aria-disabled') === 'true';
+                        const isVisible = button.offsetParent !== null && rect.width > 0 && rect.height > 0;
+                        if (isDisabled || !isVisible) continue;
+                        
+                        // Skip avoid buttons
+                        if (avoidTexts.some(avoid => buttonText.toLowerCase().includes(avoid.toLowerCase()) || 
+                                                   ariaLabel.toLowerCase().includes(avoid.toLowerCase()))) {
+                            continue;
+                        }
+                        
+                        // Look for Reply button characteristics
+                        const hasReplyText = buttonText.toLowerCase() === 'reply' || buttonText === '답글';
+                        const hasReplyAria = ariaLabel.toLowerCase().includes('reply') || ariaLabel.includes('답글');
+                        const hasReplyTestId = dataTestId.includes('reply');
+                        const isInBottomHalf = rect.top > window.innerHeight * 0.5;
+                        
+                        if ((hasReplyText || hasReplyAria || hasReplyTestId) && !isInTopArea) {
+                            console.log(`DEBUG: Found specific Reply button - Text: "${buttonText}", Location: bottom-half: ${isInBottomHalf}`);
+                            try {
+                                button.click();
+                                return { success: true, buttonText: buttonText, method: 'specific-reply-click' };
+                            } catch (error) {
+                                console.log(`DEBUG: Specific reply button click failed: ${error}`);
+                            }
+                        }
+                    }
+                    
+                    return { success: false };
+                }, isModal);
+
+                if (buttonClickResult.success) {
+                    buttonClicked = true;
+                    console.log(`${this.personality.name}: Clicked reply button "${buttonClickResult.buttonText}" using ${buttonClickResult.method}`);
+                    
+                    // Wait for the action to process
+                    await Utilities.delay(2000);
+                    
+                    // Verify the click worked by checking if we're still on the same page or if something changed
+                    const clickVerification = await this.page.evaluate(() => {
+                        // Check if there are any success indicators
+                        const indicators = [
+                            document.querySelector('[data-testid="toast"]'), // Success toast
+                            document.querySelector('.tweet-success'), // Success message
+                            !document.querySelector('[data-testid="tweetTextarea_0"]'), // Textarea disappeared
+                            window.location.href.includes('/status/') && !window.location.href.includes('/compose') // Back to status page
+                        ];
+                        return indicators.some(indicator => indicator);
+                    });
+                    
+                    console.log(`${this.personality.name}: Click verification result: ${clickVerification ? 'Success' : 'May have failed'}`);
+                }
+            } catch (error) {
+                console.log(`${this.personality.name}: Enhanced text-based button search failed:`, error.message);
+            }
+        }
+
+        // Approach 3: Try alternative selectors (different for modal vs inline)
+        if (!buttonClicked) {
+            const alternativeSelectors = isModal ? [
+                // Modal-specific selectors
+                '[data-testid="tweetButtonInline"]',
+                '[data-testid="sendTweet"]', 
+                '[aria-label*="Tweet"]',
+                '[aria-label*="Reply"]',
+                '[aria-label*="게시"]',
+                '[aria-label*="답글"]',
+                'button[type="submit"]',
+                'div[role="button"][tabindex="0"]'
+            ] : [
+                // Inline page-specific selectors - prioritize exact Reply button
+                'button:has-text("Reply"):visible',
+                'button:has-text("답글"):visible', 
+                '[data-testid="tweetButton"]:visible',
+                '[data-testid="tweetButtonInline"]:visible',
+                '[data-testid="sendTweet"]:visible',
+                // More specific inline reply selectors
+                'div[data-testid="toolBar"] button[role="button"]',
+                'div[data-testid="reply"] button',
+                'button[aria-label*="Reply"]',
+                'button[aria-label*="답글"]',
+                'button[aria-label*="게시"]',
+                // Generic button selectors for inline
+                'button[data-testid*="tweet"]',
+                'button[data-testid*="reply"]',
+                'button[data-testid*="Button"]',
+                '[role="button"][data-testid*="tweet"]',
+                '[role="button"][data-testid*="Button"]',
+                'button[type="submit"]',
+                'div[role="button"][tabindex="0"]',
+                // Fallback text-based selectors
+                'button:has-text("게시하기")',
+                'button:has-text("Post")'
+            ];
+
+            for (const selector of alternativeSelectors) {
+                try {
+                    const button = await this.page.$(selector);
+                    if (button) {
+                        const isVisible = await button.isIntersectingViewport();
+                        const isEnabled = await this.page.evaluate(el => {
+                            return !el.disabled && el.getAttribute('aria-disabled') !== 'true';
+                        }, button);
+
+                        if (isVisible && isEnabled) {
+                            console.log(`${this.personality.name}: Attempting to click button with selector: ${selector}`);
+                            
+                            // Try multiple click approaches
+                            try {
+                                await button.click();
+                                console.log(`${this.personality.name}: Successfully clicked button with selector: ${selector}`);
+                            } catch (clickError) {
+                                console.log(`${this.personality.name}: Standard click failed, trying force click`);
+                                await this.page.evaluate(el => el.click(), button);
+                            }
+                            
+                            buttonClicked = true;
+                            
+                            // Wait and verify
+                            await Utilities.delay(2000);
+                            const stillOnPage = await this.page.evaluate(() => {
+                                return !!document.querySelector('[data-testid="tweetTextarea_0"]');
+                            });
+                            
+                            if (stillOnPage) {
+                                console.log(`${this.personality.name}: Warning - still on reply page after clicking ${selector}`);
+                                buttonClicked = false; // Reset and try next selector
+                                continue;
+                            }
+                            
+                            console.log(`${this.personality.name}: Successfully submitted reply using selector: ${selector}`);
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    continue; // Try next selector
+                }
+            }
+        }
+
+        // Approach 4: Last resort - find any clickable button in the reply area
+        if (!buttonClicked) {
+            try {
+                const lastResortButton = await this.page.evaluate((isModal) => {
+                    // Look for buttons that are likely to be the submit button
+                    const allButtons = document.querySelectorAll('button, [role="button"]');
+                    console.log(`DEBUG: Found ${allButtons.length} buttons to check`);
+                    
+                    for (const button of allButtons) {
+                        const rect = button.getBoundingClientRect();
+                        const isEnabled = !button.disabled && button.getAttribute('aria-disabled') !== 'true';
+                        const isVisible = button.offsetParent !== null && rect.width > 0 && rect.height > 0;
+                        const buttonText = button.textContent?.trim() || '';
+                        const dataTestId = button.getAttribute('data-testid') || '';
+                        const ariaLabel = button.getAttribute('aria-label') || '';
+                        
+                        console.log(`DEBUG: Button - Text: "${buttonText}", TestId: "${dataTestId}", AriaLabel: "${ariaLabel}", Enabled: ${isEnabled}, Visible: ${isVisible}`);
+                        
+                        if (!isEnabled || !isVisible) continue;
+                        
+                        let isLikelyReplyButton = false;
+                        
+                        if (isModal) {
+                            // Modal mode: look for typical modal submit buttons
+                            const isInBottomArea = rect.bottom > window.innerHeight * 0.3;
+                            const hasSubmitProperties = button.type === 'submit' || 
+                                                      buttonText.length < 20 ||
+                                                      dataTestId.includes('tweet') ||
+                                                      dataTestId.includes('Button');
+                            isLikelyReplyButton = isInBottomArea && hasSubmitProperties;
+                        } else {
+                            // Inline mode: look for reply-specific buttons
+                            const hasReplyKeywords = buttonText.toLowerCase().includes('reply') ||
+                                                   buttonText.includes('답글') ||
+                                                   buttonText.includes('게시') ||
+                                                   buttonText.toLowerCase().includes('post') ||
+                                                   ariaLabel.toLowerCase().includes('reply') ||
+                                                   ariaLabel.includes('답글') ||
+                                                   dataTestId.includes('tweet') ||
+                                                   dataTestId.includes('reply');
+                            
+                            const isInReplyArea = rect.bottom > window.innerHeight * 0.2;
+                            isLikelyReplyButton = hasReplyKeywords && isInReplyArea;
+                        }
+                        
+                        if (isLikelyReplyButton) {
+                            console.log(`DEBUG: Clicking button with text: "${buttonText}", testId: "${dataTestId}"`);
+                            button.click();
+                            return true;
+                        }
+                    }
+                    return false;
+                }, isModal);
+
+                if (lastResortButton) {
+                    buttonClicked = true;
+                    console.log(`${this.personality.name}: Clicked reply button using last resort method (${isModal ? 'Modal' : 'Inline'} mode)`);
+                }
+            } catch (error) {
+                console.log(`${this.personality.name}: Last resort button search failed:`, error.message);
+            }
+        }
+
+        if (!buttonClicked) {
+            // Additional debugging - capture current page state
+            const debugInfo = await this.page.evaluate(() => {
+                const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+                return {
+                    url: window.location.href,
+                    totalButtons: buttons.length,
+                    visibleButtons: buttons.filter(b => b.offsetParent !== null).length,
+                    enabledButtons: buttons.filter(b => !b.disabled && b.getAttribute('aria-disabled') !== 'true').length,
+                    buttonsWithText: buttons.filter(b => b.textContent?.trim()).map(b => ({
+                        text: b.textContent.trim(),
+                        testId: b.getAttribute('data-testid'),
+                        ariaLabel: b.getAttribute('aria-label'),
+                        enabled: !b.disabled && b.getAttribute('aria-disabled') !== 'true',
+                        visible: b.offsetParent !== null
+                    })).slice(0, 10) // Limit to first 10 for readability
+                };
+            });
+            
+            console.error(`${this.personality.name}: Failed to find and click reply button with all methods`);
+            console.error(`${this.personality.name}: Debug info:`, debugInfo);
+            console.error(`${this.personality.name}: Reply mode was: ${isModal ? 'Modal' : 'Inline page'}`);
+            
+            // Take a screenshot for debugging
+            await this.errorHandler.takeScreenshot('reply-button-not-found');
+            
+            throw new Error('Unable to find reply/post button');
+        }
 
         await Utilities.delay(3000);
         console.log(`${this.personality.name} successfully replied to @${targetUsername}: ${reply}`);
@@ -892,7 +1724,156 @@ class ReplyOperations {
             currentBytes += charBytes;
         }
         
-        return truncated;
+                return truncated;
+    }
+
+    // Helper function to extract complete text including @mentions for use in context
+    extractFullTweetContentInContext(element) {
+        if (!element) return '';
+        
+        // Extract text content including emojis and @mentions
+        let text = '';
+        
+        // Method 1: Use innerText which preserves more content than textContent
+        if (element.innerText) {
+            text = element.innerText;
+        } else if (element.textContent) {
+            text = element.textContent;
+        }
+        
+        // Method 2: Walk through child nodes to capture all content including @mentions
+        if (!text.includes('@')) {
+            const parts = [];
+            const walker = document.createTreeWalker(
+                element,
+                NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                null,
+                false
+            );
+            
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const textContent = node.textContent.trim();
+                    if (textContent) {
+                        parts.push(textContent);
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.nodeName === 'IMG' && node.alt) {
+                        // For emoji images, get the alt text
+                        parts.push(node.alt);
+                    } else if (node.nodeName === 'A') {
+                        // For links (potential @mentions)
+                        const href = node.getAttribute('href');
+                        const linkText = node.textContent;
+                        
+                        if (href && href.includes('/@') && !linkText.startsWith('@')) {
+                            // This is a @mention link
+                            const username = href.split('/@')[1]?.split('/')[0];
+                            if (username) {
+                                parts.push('@' + username);
+                            } else {
+                                parts.push(linkText);
+                            }
+                        } else if (linkText.startsWith('@')) {
+                            parts.push(linkText);
+                        } else {
+                            parts.push(linkText);
+                        }
+                    }
+                }
+            }
+            
+            if (parts.length > 0) {
+                text = parts.join(' ');
+            }
+        }
+        
+        return text.trim();
+    }
+
+    // Helper function to extract complete text including @mentions
+    extractFullTweetContent(element) {
+        if (!element) return '';
+        
+        // Try multiple approaches to extract complete text including @mentions
+        let text = '';
+        
+        // Method 1: Use innerText which preserves more content than textContent
+        if (element.innerText) {
+            text = element.innerText;
+        } else if (element.textContent) {
+            text = element.textContent;
+        }
+        
+        // Method 2: If still missing @mentions, try walking through child nodes
+        if (text && !text.includes('@')) {
+            const walker = document.createTreeWalker(
+                element,
+                NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                {
+                    acceptNode: function(node) {
+                        // Accept text nodes and link elements (which might contain @mentions)
+                        if (node.nodeType === Node.TEXT_NODE ||
+                            (node.nodeType === Node.ELEMENT_NODE && 
+                             (node.tagName === 'A' || node.tagName === 'SPAN'))) {
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                        return NodeFilter.FILTER_SKIP;
+                    }
+                }
+            );
+            
+            let fullText = '';
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    fullText += node.textContent;
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    // Check if this element contains @mention
+                    const href = node.getAttribute('href');
+                    if (href && href.includes('/')) {
+                        const linkText = node.textContent;
+                        if (linkText.startsWith('@') || href.includes('/@')) {
+                            fullText += linkText.startsWith('@') ? linkText : '@' + linkText;
+                        } else {
+                            fullText += linkText;
+                        }
+                    } else {
+                        fullText += node.textContent;
+                    }
+                }
+            }
+            
+            if (fullText.trim()) {
+                text = fullText;
+            }
+        }
+        
+        // Method 3: Alternative approach - check for links that might be @mentions
+        if (!text.includes('@')) {
+            const links = element.querySelectorAll('a[href*="/@"], a[href*="/"], span[dir="ltr"]');
+            let reconstructedText = element.textContent || '';
+            
+            for (const link of links) {
+                const href = link.getAttribute('href');
+                const linkText = link.textContent;
+                
+                if (href && href.includes('/@') && !linkText.startsWith('@')) {
+                    // This is likely a @mention link
+                    const username = href.split('/@')[1];
+                    if (username) {
+                        reconstructedText = reconstructedText.replace(linkText, '@' + username);
+                    }
+                }
+            }
+            
+            if (reconstructedText !== (element.textContent || '')) {
+                text = reconstructedText;
+            }
+        }
+        
+        return text.trim();
     }
 
     // Helper function to extract full tweet content including quoted tweets
@@ -900,7 +1881,7 @@ class ReplyOperations {
         const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
         if (!contentElement) return '';
         
-        let tweetContent = contentElement.textContent;
+        let tweetContent = this.extractFullTweetContent(contentElement);
         
         // Try multiple possible selectors for quoted tweets
         const quotedTweetSelectors = [

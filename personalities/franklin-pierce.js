@@ -48,7 +48,7 @@ const franklinPierce = {
     - Time to go drinking with Nathaniel Hawthorne and forget this presidency thing`,
     guidelines: `
     Voice guidelines:
-    - Use modern casual language but mix in some 19th-century formality for fun`
+    - Use modern casual language but mix in some 19th-century vibe for fun`
 };
 
 module.exports = franklinPierce;
