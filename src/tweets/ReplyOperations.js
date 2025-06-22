@@ -1,4 +1,7 @@
 const Utilities = require('../utils/Utilities');
+const TweetContentExtractor = require('../utils/TweetContentExtractor');
+const TweetTextProcessor = require('../utils/TweetTextProcessor');
+const GeminiApiClient = require('../utils/GeminiApiClient');
 
 class ReplyOperations {
     constructor(page, personality, errorHandler, currentUsername, allBotUsernames) {
@@ -7,6 +10,131 @@ class ReplyOperations {
         this.errorHandler = errorHandler;
         this.currentUsername = currentUsername;
         this.allBotUsernames = allBotUsernames;
+    }
+
+    // Common browser-side functions (to be injected into evaluate contexts)
+    getBrowserHelperFunctions() {
+        return `
+            // Helper function to extract tweet content including quoted tweets
+            function extractTweetContent(tweetElement) {
+                const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
+                if (!contentElement) return '';
+                
+                let tweetContent = extractFullTweetContent(contentElement);
+                
+                // Try multiple approaches to find quoted tweets
+                const allTweetTexts = tweetElement.querySelectorAll('[data-testid="tweetText"]');
+                if (allTweetTexts.length > 1) {
+                    // If there are multiple tweetText elements, the second one is likely the quoted tweet
+                    for (let i = 1; i < allTweetTexts.length; i++) {
+                        const additionalText = extractFullTweetContent(allTweetTexts[i]);
+                        if (additionalText && additionalText !== tweetContent && !tweetContent.includes(additionalText)) {
+                            tweetContent += "\\n\\n[Quoted tweet from someone else] " + additionalText;
+                        }
+                    }
+                }
+                
+                // Also try looking for any nested article elements which might contain quoted content
+                const nestedArticles = tweetElement.querySelectorAll('article');
+                if (nestedArticles.length > 1) {
+                    for (let i = 1; i < nestedArticles.length; i++) {
+                        const nestedText = nestedArticles[i].querySelector('[data-testid="tweetText"]');
+                        if (nestedText) {
+                            const quotedContent = extractFullTweetContent(nestedText);
+                            if (quotedContent && quotedContent !== tweetContent && !tweetContent.includes(quotedContent)) {
+                                tweetContent += "\\n\\n[Quoted tweet from someone else] " + quotedContent;
+                            }
+                        }
+                    }
+                }
+                
+                return tweetContent;
+            }
+
+            // Helper function to extract complete text including @mentions
+            function extractFullTweetContent(element) {
+                if (!element) return '';
+                
+                // Try multiple approaches to extract complete text including @mentions
+                let text = '';
+                
+                // Method 1: Use innerText which preserves more content than textContent
+                if (element.innerText) {
+                    text = element.innerText;
+                } else if (element.textContent) {
+                    text = element.textContent;
+                }
+                
+                // Method 2: If still missing @mentions, try walking through child nodes
+                if (text && !text.includes('@')) {
+                    const walker = document.createTreeWalker(
+                        element,
+                        NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                        {
+                            acceptNode: function(node) {
+                                // Accept text nodes and link elements (which might contain @mentions)
+                                if (node.nodeType === Node.TEXT_NODE ||
+                                    (node.nodeType === Node.ELEMENT_NODE && 
+                                     (node.tagName === 'A' || node.tagName === 'SPAN'))) {
+                                    return NodeFilter.FILTER_ACCEPT;
+                                }
+                                return NodeFilter.FILTER_SKIP;
+                            }
+                        }
+                    );
+                    
+                    let fullText = '';
+                    let node;
+                    while (node = walker.nextNode()) {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            fullText += node.textContent;
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                            // Check if this element contains @mention
+                            const href = node.getAttribute('href');
+                            if (href && href.includes('/')) {
+                                const linkText = node.textContent;
+                                if (linkText.startsWith('@') || href.includes('/@')) {
+                                    fullText += linkText.startsWith('@') ? linkText : '@' + linkText;
+                                } else {
+                                    fullText += linkText;
+                                }
+                            } else {
+                                fullText += node.textContent;
+                            }
+                        }
+                    }
+                    
+                    if (fullText.trim()) {
+                        text = fullText;
+                    }
+                }
+                
+                // Method 3: Alternative approach - check for links that might be @mentions
+                if (!text.includes('@')) {
+                    const links = element.querySelectorAll('a[href*="/@"], a[href*="/"], span[dir="ltr"]');
+                    let reconstructedText = element.textContent || '';
+                    
+                    for (const link of links) {
+                        const href = link.getAttribute('href');
+                        const linkText = link.textContent;
+                        
+                        if (href && href.includes('/@') && !linkText.startsWith('@')) {
+                            // This is likely a @mention link
+                            const username = href.split('/@')[1];
+                            if (username) {
+                                reconstructedText = reconstructedText.replace(linkText, '@' + username);
+                            }
+                        }
+                    }
+                    
+                    if (reconstructedText !== (element.textContent || '')) {
+                        text = reconstructedText;
+                    }
+                }
+                
+                return text.trim();
+            }
+        `;
     }
 
     async generateReply(threadContext, isBot = false, isFromNotification = false) {
@@ -41,7 +169,7 @@ class ReplyOperations {
             this.personality.guidelines + '\n' +
             `Thread context:\n${threadPrompt}\n` +
             "IMPORTANT: Keep your tweet under 280 bytes. Don't use @, hashtags, or emojis. Simply write the tweet content." +
-            "\nIMPORTANT: 트윗은 한국어로 작성하세요.";
+            "\nIMPORTANT: 트윗은 한국어로 작성하세요. (하게체나 하오체를 사용하지 마세요.)";
 
         // Different user prompts based on context and whether target is bot or user
         let userPrompt;
@@ -55,81 +183,8 @@ class ReplyOperations {
                 : "Generate a comment to Belle's tweet you found while browsing the feed. You're choosing to engage with her tweet among many others you've seen, so make your response meaningful while maintaining your historical persona. Consider the entire conversation thread for context. This could be a single tweet she posted to her feed, or a tweet within a thread where she's talking to another user. Be concise and relevant.";
         }
 
-        console.log('\nComplete prompt being sent to Gemini:');
-        console.log('System message:', systemPrompt);
-        console.log('User message:', userPrompt);
-
-            const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': process.env.GEMINI_API_KEY
-            },
-            body: JSON.stringify({
-                contents: [
-                    {
-                        role: 'user',
-                        parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
-                    }
-                ],
-                generationConfig: {
-                    temperature: 0.9,
-                    maxOutputTokens: 4000
-                }
-            })
-        });
-
-        console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.log('Error response body:', errorText);
-            throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
-        }
-
-        const data = await response.json();
-        console.log('Full API response:', JSON.stringify(data, null, 2));
-        
-        // Check for thinking vs regular response structure
-        let reply = null;
-        const candidate = data.candidates?.[0];
-        
-        if (candidate?.content?.parts?.[0]?.text) {
-            // Standard response format
-            reply = candidate.content.parts[0].text;
-        } else if (candidate?.content?.parts) {
-            // Look for text in any part
-            for (const part of candidate.content.parts) {
-                if (part.text) {
-                    reply = part.text;
-                    break;
-                }
-            }
-        } else if (candidate?.content?.text) {
-            // Alternative structure
-            reply = candidate.content.text;
-        }
-        
-        // If still no reply, try to extract from thinking process
-        if (!reply && data.usageMetadata?.thoughtsTokenCount > 0) {
-            console.log('Looking for content after thinking process...');
-            // Check if there are multiple parts or hidden content
-            if (candidate?.content?.role === 'model' && candidate.finishReason !== 'MAX_TOKENS') {
-                // Check for alternative content structures
-                console.log('Full candidate content:', JSON.stringify(candidate.content, null, 2));
-            }
-        }
-
-        if (!reply) {
-            console.log('No reply found in response. Checking for other content...');
-            console.log('Candidates:', data.candidates);
-            console.log('Usage metadata:', data.usageMetadata);
-            console.log('Prompt feedback:', data.promptFeedback);
-            throw new Error('No response content received from Gemini');
-        }
-
-        return this.cleanupTweet(reply);
+        const reply = await GeminiApiClient.generateContent(systemPrompt, userPrompt, this.personality.name);
+        return TweetTextProcessor.cleanupTweet(reply);
     }
 
     async processAndReplyToTweet(tweetData, targetUsername, isFromNotification = false) {
@@ -140,25 +195,70 @@ class ReplyOperations {
 
         await Utilities.delay(3000);
 
+        // CRITICAL: Check if we've already replied to this tweet
+        console.log(`${this.personality.name}: Checking for existing replies before responding...`);
+        const alreadyReplied = await this.checkIfAlreadyReplied(tweetData);
+        
+        if (alreadyReplied) {
+            console.log(`${this.personality.name}: Already replied to this tweet. Skipping to avoid duplicate.`);
+            return;
+        }
+
         // Get thread context
         const threadContext = await this.getThreadContext();
 
-        // Find and click reply on the target tweet using partial content match
-        await this.page.evaluate((targetContent) => {
-            const tweets = document.querySelectorAll('[data-testid="tweet"]');
-            for (const tweet of tweets) {
-                const contentElement = tweet.querySelector('[data-testid="tweetText"]');
-                if (contentElement && contentElement.innerText.includes(targetContent)) {
-                    const replyButton = tweet.querySelector('[data-testid="reply"]');
-                    if (replyButton) {
-                        replyButton.click();
-                        return;
+        // Check if we need to open reply modal first
+        const needsReplyModal = await this.page.evaluate(() => {
+            // Check if we're on a tweet page but reply modal is not open
+            const isOnTweetPage = window.location.href.includes('/status/');
+            const hasReplyTextarea = document.querySelector('[data-testid="tweetTextarea_0"]');
+            const hasModal = document.querySelector('[aria-modal="true"]');
+            
+            console.log(`DEBUG: On tweet page: ${isOnTweetPage}, Has textarea: ${!!hasReplyTextarea}, Has modal: ${!!hasModal}`);
+            
+            // If we're on tweet page but don't have textarea or modal, need to click reply
+            return isOnTweetPage && !hasReplyTextarea && !hasModal;
+        });
+
+        if (needsReplyModal) {
+            console.log(`${this.personality.name}: Need to open reply modal first`);
+            
+            // Find and click reply on the target tweet using partial content match
+            const replyClicked = await this.page.evaluate((targetContent) => {
+                const tweets = document.querySelectorAll('[data-testid="tweet"]');
+                for (const tweet of tweets) {
+                    const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                    if (contentElement && contentElement.innerText.includes(targetContent.substring(0, 50))) {
+                        const replyButton = tweet.querySelector('[data-testid="reply"]');
+                        if (replyButton) {
+                            console.log(`DEBUG: Clicking reply button for tweet: "${contentElement.innerText.substring(0, 50)}..."`);
+                            replyButton.click();
+                            return true;
+                        }
                     }
                 }
+                
+                // Fallback: try to find any reply button
+                const replyButtons = document.querySelectorAll('[data-testid="reply"]');
+                if (replyButtons.length > 0) {
+                    console.log(`DEBUG: Fallback - clicking first reply button found`);
+                    replyButtons[0].click();
+                    return true;
+                }
+                
+                return false;
+            }, tweetData.content);
+            
+            if (replyClicked) {
+                console.log(`${this.personality.name}: Reply button clicked, waiting for modal...`);
+                await Utilities.delay(3000);
+            } else {
+                console.log(`${this.personality.name}: Could not find reply button`);
             }
-        }, tweetData.content);
-
-        await Utilities.delay(2000);
+        } else {
+            console.log(`${this.personality.name}: Reply interface already available`);
+            await Utilities.delay(1000);
+        }
 
         // Check if we're replying to another bot
         const isBot = this.allBotUsernames.some(botUsername => targetUsername.includes(botUsername));
@@ -734,6 +834,13 @@ class ReplyOperations {
             // Process each bot notification
             for (const notification of botNotifications) {
                 try {
+                    // CRITICAL: Check if we've already replied to this notification
+                    const hasReplied = await this.checkIfAlreadyReplied(notification);
+                    if (hasReplied) {
+                        console.log(`${this.personality.name}: Already replied to bot notification, skipping...`);
+                        continue;
+                    }
+                    
                     // Check thread depth before replying
                     const threadDepth = await this.getThreadDepth(notification.tweetUrl);
                     
@@ -945,144 +1052,56 @@ class ReplyOperations {
                 window.location.href = tweetUrl;
             }, tweetData.tweetUrl);
 
-            // Increase wait time to ensure page loads completely
+            // Wait for page to load completely
             await Utilities.delay(5000);
 
-            // Use the bot's actual username for checking replies
-            const botUsername = this.currentUsername;
+            // Use the bot's username from credentials (without @ symbol if present)
+            const botUsername = this.currentUsername.replace('@', '');
+            
+            console.log(`DEBUG: Looking for bot username: "${botUsername}"`);
 
-            // Check for bot's presence in the thread with detailed debugging
-            const debugInfo = await this.page.evaluate((botUsername, targetContent, personalityName) => {
-                // Get all tweets in the thread
+            // Simple check: Does this page contain any tweet from our bot?
+            const hasReply = await this.page.evaluate((botUsername) => {
+                console.log(`DEBUG: Checking page for any replies from bot: "${botUsername}"`);
+                
+                // Get all tweets on this page
                 const allTweets = document.querySelectorAll('[data-testid="tweet"]');
-                const tweetsArray = Array.from(allTweets);
+                console.log(`DEBUG: Found ${allTweets.length} tweets on page`);
                 
-                console.log(`DEBUG: Found ${tweetsArray.length} tweets in thread`);
-                console.log(`DEBUG: Looking for target content: "${targetContent.substring(0, 100)}..."`);
-                
-                // Find the target tweet's index using multiple matching strategies
-                let targetIndex = -1;
-                
-                // Strategy 1: Partial content match
-                targetIndex = tweetsArray.findIndex(tweet => {
-                    const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
-                    return tweetText && tweetText.includes(targetContent.substring(0, 50));
-                });
-                
-                // Strategy 2: If not found, try with just the first line
-                if (targetIndex === -1) {
-                    const firstLine = targetContent.split('\n')[0];
-                    console.log(`DEBUG: Trying first line match: "${firstLine}"`);
-                    targetIndex = tweetsArray.findIndex(tweet => {
-                        const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
-                        return tweetText && tweetText.includes(firstLine);
-                    });
-                }
-                
-                // Strategy 3: If still not found, try looking for quoted content
-                if (targetIndex === -1) {
-                    const quotedPart = targetContent.includes('[Quoted tweet from someone else]') 
-                        ? targetContent.split('[Quoted tweet from someone else]')[0].trim()
-                        : targetContent;
-                    console.log(`DEBUG: Trying quoted part match: "${quotedPart.substring(0, 50)}..."`);
-                    targetIndex = tweetsArray.findIndex(tweet => {
-                        const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
-                        return tweetText && tweetText.includes(quotedPart.substring(0, 30));
-                    });
-                }
-
-                console.log(`DEBUG: Target tweet index: ${targetIndex}`);
-                
-                if (targetIndex === -1) {
-                    console.log('DEBUG: Target tweet not found, listing all tweet contents:');
-                    tweetsArray.forEach((tweet, i) => {
-                        const tweetText = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
-                        const usernameText = tweet.querySelector('[data-testid="User-Name"]')?.innerText;
-                        console.log(`DEBUG: Tweet ${i}: User: "${usernameText}", Content: "${tweetText?.substring(0, 100)}..."`);
-                    });
-                    return { hasReply: false, targetFound: false, debugInfo: 'Target tweet not found' };
-                }
-
-                // Check all tweets in the thread after the target tweet
-                const repliesSection = tweetsArray.slice(targetIndex + 1);
-                console.log(`DEBUG: Checking ${repliesSection.length} replies after target tweet`);
-                
-                let foundBotReply = false;
-                const botReplies = [];
-                
-                // Look for any reply from the bot using multiple matching criteria
-                repliesSection.forEach((tweet, i) => {
+                // Check each tweet to see if it's from our bot
+                for (let i = 0; i < allTweets.length; i++) {
+                    const tweet = allTweets[i];
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
-                    if (!usernameElement) return;
+                    if (!usernameElement) continue;
                     
                     const usernameText = usernameElement.innerText;
-                    const tweetContent = tweet.querySelector('[data-testid="tweetText"]')?.innerText;
+                    console.log(`DEBUG: Tweet ${i}: User: "${usernameText}"`);
                     
-                    console.log(`DEBUG: Reply ${i}: User: "${usernameText}", Content: "${tweetContent?.substring(0, 80)}..."`);
-                    
-                    let isMatch = false;
-                    let matchReason = '';
-                    
-                    // Multiple matching strategies:
-                    // 1. Check if username contains the bot's username
-                    if (usernameText.includes(botUsername)) {
-                        isMatch = true;
-                        matchReason = 'username contains botUsername';
+                    // Extract @username from the displayed text and compare
+                    const atMatch = usernameText.match(/@([a-zA-Z0-9_]+)/);
+                    if (atMatch && atMatch[1] === botUsername) {
+                        console.log(`DEBUG: ✅ Found bot reply! @${atMatch[1]} === @${botUsername}`);
+                        return true;
                     }
                     
-                    // 2. Check if username contains the personality name
-                    else if (personalityName && usernameText.includes(personalityName)) {
-                        isMatch = true;
-                        matchReason = 'username contains personality name';
+                    // Fallback: Check if the username text contains our bot username
+                    if (usernameText.toLowerCase().includes(botUsername.toLowerCase())) {
+                        console.log(`DEBUG: ✅ Found bot reply! "${usernameText}" contains "${botUsername}"`);
+                        return true;
                     }
-                    
-                    // 3. Check @username pattern in the text
-                    else if (usernameText.includes('@' + botUsername)) {
-                        isMatch = true;
-                        matchReason = '@username pattern match';
-                    }
-                    
-                    // 4. Extract @username from the displayed text and compare
-                    else {
-                        const atMatch = usernameText.match(/@([a-zA-Z0-9_]+)/);
-                        if (atMatch && atMatch[1] === botUsername) {
-                            isMatch = true;
-                            matchReason = 'regex @username match';
-                        }
-                    }
-                    
-                    if (isMatch) {
-                        foundBotReply = true;
-                        botReplies.push({
-                            username: usernameText,
-                            content: tweetContent?.substring(0, 100),
-                            matchReason: matchReason
-                        });
-                        console.log(`DEBUG: FOUND BOT REPLY! Reason: ${matchReason}`);
-                    }
-                });
+                }
                 
-                console.log(`DEBUG: Bot replies found: ${botReplies.length}`);
-                
-                return { 
-                    hasReply: foundBotReply, 
-                    targetFound: true, 
-                    debugInfo: `Found ${botReplies.length} bot replies`,
-                    botReplies: botReplies
-                };
-            }, botUsername, tweetData.content, this.personality.name);
+                console.log(`DEBUG: No bot replies found on page`);
+                return false;
+            }, botUsername);
 
-            console.log(`${this.personality.name}: Debug results:`, debugInfo);
-            const hasReply = debugInfo.hasReply;
-
-            const replyStatus = hasReply ? 'Found reply' : 'No reply found';
-            console.log(`${this.personality.name}: Checking for existing reply - ${replyStatus}`);
-            console.log(`${this.personality.name}: Bot username: "${botUsername}", Personality name: "${this.personality.name}"`);
+            const replyStatus = hasReply ? 'Found existing reply' : 'No existing reply found';
+            console.log(`${this.personality.name}: ${replyStatus} on this tweet page`);
             
             return hasReply;
 
         } catch (error) {
-            console.error('Error checking for existing reply:', error);
+            console.error(`${this.personality.name}: Error checking for existing reply:`, error);
             return true; // Err on the side of caution - assume we've replied if there's an error
         }
     }
@@ -1266,13 +1285,14 @@ class ReplyOperations {
                     const buttons = document.querySelectorAll('button, [role="button"]');
                     
                     // Define buttons to avoid (these are not reply buttons)
-                    const avoidTexts = ['Done', '완료', 'Cancel', '취소', 'Close', '닫기', 'Back', '뒤로', 'Delete', '삭제'];
+                    const avoidTexts = ['Done', '완료', 'Cancel', '취소', 'Close', '닫기', 'Back', '뒤로', 'Delete', '삭제', 'Replying to', '답글 대상'];
                     
                     // Check if we're in "Replying to" modal context
                     const isReplyingToModal = document.querySelector('[aria-labelledby="modal-header"]') && 
                                             (document.textContent.includes('Replying to') || document.textContent.includes('답글 대상'));
                     
                     // For replying to modal, be very strict about Reply button only
+                    // Always prioritize exact "Reply" text first
                     const priorityTexts = isReplyingToModal ? ['Reply', '답글'] : 
                                         isModal ? ['Reply', '답글', 'Post', '게시하기', 'Tweet', '트윗'] : 
                                         ['Reply', '답글', 'Post', '게시하기', 'Tweet', '트윗'];
@@ -1290,12 +1310,29 @@ class ReplyOperations {
                                 continue;
                             }
                             
-                            // Exact match first, then includes
-                            const isExactMatch = buttonText.toLowerCase() === targetText.toLowerCase();
-                            const isPartialMatch = buttonText.toLowerCase().includes(targetText.toLowerCase()) ||
-                                                 targetText.toLowerCase().includes(buttonText.toLowerCase());
+                            // Additional check: Skip "Replying to" header elements
+                            const parentElement = button.parentElement;
+                            const isReplyingToHeader = parentElement && (
+                                parentElement.textContent?.includes('Replying to') ||
+                                parentElement.textContent?.includes('답글 대상') ||
+                                button.getAttribute('aria-label')?.includes('Replying to') ||
+                                button.getAttribute('aria-label')?.includes('답글 대상')
+                            );
                             
-                            if (isExactMatch || isPartialMatch) {
+                            if (isReplyingToHeader) {
+                                console.log(`DEBUG: Skipping "Replying to" header element: "${buttonText}"`);
+                                continue;
+                            }
+                            
+                            // Exact match first (highest priority)
+                            const isExactMatch = buttonText.toLowerCase() === targetText.toLowerCase();
+                            
+                            // For Reply buttons, be very strict about exact matches
+                            const isValidReplyMatch = (targetText.toLowerCase() === 'reply' || targetText === '답글') ? 
+                                                    isExactMatch : 
+                                                    (isExactMatch || buttonText.toLowerCase().includes(targetText.toLowerCase()));
+                            
+                            if (isValidReplyMatch) {
                                 // Check if button is enabled and visible
                                 const isDisabled = button.disabled || button.getAttribute('aria-disabled') === 'true';
                                 const isVisible = button.offsetParent !== null;
@@ -1508,7 +1545,7 @@ class ReplyOperations {
                             }
                             
                             console.log(`${this.personality.name}: Successfully submitted reply using selector: ${selector}`);
-                            break;
+                    break;
                         }
                     }
                 } catch (error) {
@@ -1624,316 +1661,9 @@ class ReplyOperations {
         }
     }
 
-    cleanupTweet(tweet) {
-        // Remove any quotes that might have been added by the AI
-        if (tweet.startsWith('"') && tweet.endsWith('"')) {
-            tweet = tweet.slice(1, -1).trim();
-        }
 
-        // Remove hashtags
-        tweet = tweet.replace(/#\w+/g, '');
 
-        // Remove @ mentions
-        tweet = tweet.replace(/@\w+/g, '');
 
-        // Clean up any double spaces created by removals
-        tweet = tweet.replace(/\s+/g, ' ').trim();
-
-        // Enforce byte limit (280 bytes)
-        tweet = this.truncateByByteLength(tweet, 280);
-
-        return tweet;
-    }
-
-    // Calculate byte length considering Korean characters as 2 bytes and English as 1 byte
-    calculateByteLength(text) {
-        let byteLength = 0;
-        for (let i = 0; i < text.length; i++) {
-            const char = text.charAt(i);
-            const charCode = char.charCodeAt(0);
-            
-            // Korean characters (Hangul syllables: U+AC00 to U+D7AF)
-            // Korean Jamo (U+1100 to U+11FF, U+3130 to U+318F, U+A960 to U+A97F)
-            // Other CJK characters and symbols
-            if ((charCode >= 0xAC00 && charCode <= 0xD7AF) || // Hangul syllables
-                (charCode >= 0x1100 && charCode <= 0x11FF) || // Hangul Jamo
-                (charCode >= 0x3130 && charCode <= 0x318F) || // Hangul Compatibility Jamo
-                (charCode >= 0xA960 && charCode <= 0xA97F) || // Hangul Jamo Extended-A
-                (charCode >= 0x3400 && charCode <= 0x4DBF) || // CJK Extension A
-                (charCode >= 0x4E00 && charCode <= 0x9FFF) || // CJK Unified Ideographs
-                (charCode >= 0xF900 && charCode <= 0xFAFF) || // CJK Compatibility Ideographs
-                (charCode >= 0x2E80 && charCode <= 0x2EFF) || // CJK Radicals Supplement
-                (charCode >= 0x2F00 && charCode <= 0x2FDF) || // Kangxi Radicals
-                (charCode >= 0x31C0 && charCode <= 0x31EF) || // CJK Strokes
-                (charCode >= 0x3200 && charCode <= 0x32FF) || // Enclosed CJK Letters and Months
-                (charCode >= 0x3300 && charCode <= 0x33FF) || // CJK Compatibility
-                (charCode >= 0xFE30 && charCode <= 0xFE4F) || // CJK Compatibility Forms
-                (charCode >= 0xFF00 && charCode <= 0xFFEF)) { // Halfwidth and Fullwidth Forms
-                byteLength += 2;
-            } else {
-                byteLength += 1;
-            }
-        }
-        return byteLength;
-    }
-
-    // Truncate text to fit within specified byte limit
-    truncateByByteLength(text, maxBytes) {
-        if (this.calculateByteLength(text) <= maxBytes) {
-            return text;
-        }
-
-        let truncated = '';
-        let currentBytes = 0;
-        
-        for (let i = 0; i < text.length; i++) {
-            const char = text.charAt(i);
-            const charCode = char.charCodeAt(0);
-            
-            // Calculate bytes for this character
-            let charBytes = 1;
-            if ((charCode >= 0xAC00 && charCode <= 0xD7AF) || // Hangul syllables
-                (charCode >= 0x1100 && charCode <= 0x11FF) || // Hangul Jamo
-                (charCode >= 0x3130 && charCode <= 0x318F) || // Hangul Compatibility Jamo
-                (charCode >= 0xA960 && charCode <= 0xA97F) || // Hangul Jamo Extended-A
-                (charCode >= 0x3400 && charCode <= 0x4DBF) || // CJK Extension A
-                (charCode >= 0x4E00 && charCode <= 0x9FFF) || // CJK Unified Ideographs
-                (charCode >= 0xF900 && charCode <= 0xFAFF) || // CJK Compatibility Ideographs
-                (charCode >= 0x2E80 && charCode <= 0x2EFF) || // CJK Radicals Supplement
-                (charCode >= 0x2F00 && charCode <= 0x2FDF) || // Kangxi Radicals
-                (charCode >= 0x31C0 && charCode <= 0x31EF) || // CJK Strokes
-                (charCode >= 0x3200 && charCode <= 0x32FF) || // Enclosed CJK Letters and Months
-                (charCode >= 0x3300 && charCode <= 0x33FF) || // CJK Compatibility
-                (charCode >= 0xFE30 && charCode <= 0xFE4F) || // CJK Compatibility Forms
-                (charCode >= 0xFF00 && charCode <= 0xFFEF)) { // Halfwidth and Fullwidth Forms
-                charBytes = 2;
-            }
-            
-            // Check if adding this character would exceed the limit
-            if (currentBytes + charBytes > maxBytes) {
-                // If we can't even fit "...", just return what we have
-                if (currentBytes + 3 > maxBytes) {
-                    break;
-                }
-                // Add "..." and break
-                truncated += "...";
-                break;
-            }
-            
-            truncated += char;
-            currentBytes += charBytes;
-        }
-        
-                return truncated;
-    }
-
-    // Helper function to extract complete text including @mentions for use in context
-    extractFullTweetContentInContext(element) {
-        if (!element) return '';
-        
-        // Extract text content including emojis and @mentions
-        let text = '';
-        
-        // Method 1: Use innerText which preserves more content than textContent
-        if (element.innerText) {
-            text = element.innerText;
-        } else if (element.textContent) {
-            text = element.textContent;
-        }
-        
-        // Method 2: Walk through child nodes to capture all content including @mentions
-        if (!text.includes('@')) {
-            const parts = [];
-            const walker = document.createTreeWalker(
-                element,
-                NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-                null,
-                false
-            );
-            
-            let node;
-            while (node = walker.nextNode()) {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    const textContent = node.textContent.trim();
-                    if (textContent) {
-                        parts.push(textContent);
-                    }
-                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.nodeName === 'IMG' && node.alt) {
-                        // For emoji images, get the alt text
-                        parts.push(node.alt);
-                    } else if (node.nodeName === 'A') {
-                        // For links (potential @mentions)
-                        const href = node.getAttribute('href');
-                        const linkText = node.textContent;
-                        
-                        if (href && href.includes('/@') && !linkText.startsWith('@')) {
-                            // This is a @mention link
-                            const username = href.split('/@')[1]?.split('/')[0];
-                            if (username) {
-                                parts.push('@' + username);
-                            } else {
-                                parts.push(linkText);
-                            }
-                        } else if (linkText.startsWith('@')) {
-                            parts.push(linkText);
-                        } else {
-                            parts.push(linkText);
-                        }
-                    }
-                }
-            }
-            
-            if (parts.length > 0) {
-                text = parts.join(' ');
-            }
-        }
-        
-        return text.trim();
-    }
-
-    // Helper function to extract complete text including @mentions
-    extractFullTweetContent(element) {
-        if (!element) return '';
-        
-        // Try multiple approaches to extract complete text including @mentions
-        let text = '';
-        
-        // Method 1: Use innerText which preserves more content than textContent
-        if (element.innerText) {
-            text = element.innerText;
-        } else if (element.textContent) {
-            text = element.textContent;
-        }
-        
-        // Method 2: If still missing @mentions, try walking through child nodes
-        if (text && !text.includes('@')) {
-            const walker = document.createTreeWalker(
-                element,
-                NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-                {
-                    acceptNode: function(node) {
-                        // Accept text nodes and link elements (which might contain @mentions)
-                        if (node.nodeType === Node.TEXT_NODE ||
-                            (node.nodeType === Node.ELEMENT_NODE && 
-                             (node.tagName === 'A' || node.tagName === 'SPAN'))) {
-                            return NodeFilter.FILTER_ACCEPT;
-                        }
-                        return NodeFilter.FILTER_SKIP;
-                    }
-                }
-            );
-            
-            let fullText = '';
-            let node;
-            while (node = walker.nextNode()) {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    fullText += node.textContent;
-                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                    // Check if this element contains @mention
-                    const href = node.getAttribute('href');
-                    if (href && href.includes('/')) {
-                        const linkText = node.textContent;
-                        if (linkText.startsWith('@') || href.includes('/@')) {
-                            fullText += linkText.startsWith('@') ? linkText : '@' + linkText;
-                        } else {
-                            fullText += linkText;
-                        }
-                    } else {
-                        fullText += node.textContent;
-                    }
-                }
-            }
-            
-            if (fullText.trim()) {
-                text = fullText;
-            }
-        }
-        
-        // Method 3: Alternative approach - check for links that might be @mentions
-        if (!text.includes('@')) {
-            const links = element.querySelectorAll('a[href*="/@"], a[href*="/"], span[dir="ltr"]');
-            let reconstructedText = element.textContent || '';
-            
-            for (const link of links) {
-                const href = link.getAttribute('href');
-                const linkText = link.textContent;
-                
-                if (href && href.includes('/@') && !linkText.startsWith('@')) {
-                    // This is likely a @mention link
-                    const username = href.split('/@')[1];
-                    if (username) {
-                        reconstructedText = reconstructedText.replace(linkText, '@' + username);
-                    }
-                }
-            }
-            
-            if (reconstructedText !== (element.textContent || '')) {
-                text = reconstructedText;
-            }
-        }
-        
-        return text.trim();
-    }
-
-    // Helper function to extract full tweet content including quoted tweets
-    extractTweetContent(tweetElement) {
-        const contentElement = tweetElement.querySelector('[data-testid="tweetText"]');
-        if (!contentElement) return '';
-        
-        let tweetContent = this.extractFullTweetContent(contentElement);
-        
-        // Try multiple possible selectors for quoted tweets
-        const quotedTweetSelectors = [
-            '[data-testid="quoteTweet"] [data-testid="tweetText"]',
-            '[role="blockquote"] [data-testid="tweetText"]',
-            '[data-testid="quoteTweet"] [lang]',
-            'article[role="article"] [data-testid="tweetText"]',
-            '.r-1tl8opc [data-testid="tweetText"]',  // CSS class that might be used
-            '[data-testid="tweet"] [data-testid="tweetText"]'  // Nested tweet structure
-        ];
-        
-        for (const selector of quotedTweetSelectors) {
-            const quotedTweets = tweetElement.querySelectorAll(selector);
-            // Skip the first one as it's likely the main tweet
-            if (quotedTweets.length > 1) {
-                const quotedTweet = quotedTweets[1];
-                if (quotedTweet && quotedTweet.textContent !== tweetContent) {
-                    // Try to find the username for the quoted tweet
-                    let quotedUsername = '';
-                    const usernameSelectors = [
-                        '[data-testid="quoteTweet"] [data-testid="User-Name"]',
-                        '[role="blockquote"] [data-testid="User-Name"]',
-                        '[data-testid="quoteTweet"] a[role="link"]'
-                    ];
-                    
-                    for (const userSelector of usernameSelectors) {
-                        const userElement = tweetElement.querySelector(userSelector);
-                        if (userElement) {
-                            quotedUsername = userElement.textContent;
-                            break;
-                        }
-                    }
-                    
-                    tweetContent += `\n\n[Quoted: ${quotedUsername}] ${quotedTweet.textContent}`;
-                    break;
-                }
-            }
-        }
-        
-        // Alternative approach: look for any additional tweet text within the same element
-        const allTweetTexts = tweetElement.querySelectorAll('[data-testid="tweetText"]');
-        if (allTweetTexts.length > 1) {
-            for (let i = 1; i < allTweetTexts.length; i++) {
-                const additionalText = allTweetTexts[i].textContent;
-                if (additionalText && additionalText !== tweetContent && !tweetContent.includes(additionalText)) {
-                    tweetContent += `\n\n[Quoted tweet] ${additionalText}`;
-                }
-            }
-        }
-        
-        return tweetContent;
-    }
 }
 
 module.exports = ReplyOperations;
