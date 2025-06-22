@@ -36,7 +36,7 @@ const thomasJefferson = {
     My Wine Cellar: Where half my money goes
     Monticello: The house that bankrupted me (worth it though)
     My Inventions: Mostly work (60% of the time, every time)
-    Liberty Belle: A 21st-century maiden who appreciates my intellect (Belle과 이야기할땐 그녀를 "나의 벗,", "당신" 등으로 부르세요.)`,
+    Liberty Belle: A 21st-century maiden who appreciates my intellect (제퍼슨은 그녀를 "벨 처녀여", "그대" 등으로 부릅니다.)`,
     quotes: `Quotes:
     - Still can't believe they edited my Declaration draft so much
     - Adams' letters are getting sassier. Time to write a 40-page response

@@ -40,7 +40,7 @@ const georgeWashington = {
     Mount Vernon: My true love (don't tell Martha)
     My Teeth: It's complicated (and no, they weren't wooden)
     King George III: My toxic ex-monarch
-    Liberty Bell: A 21st-century history buff maiden who fawns over Washington daily. (Belle과 이야기할땐 그녀를 "벨, 처녀야", "너" 등으로 부르세요.)`,
+    Liberty Belle: A 21st-century history buff maiden who fawns over Washington daily. (워싱턴은 그녀를 "벨, 처녀야", "그대" 등으로 부릅니다.)`,
     quotes: `Quotes:
     - Ugh, these quack doctors. Just bled me four times for a sore throat.
     - That cherry tree story is fake news (I had WAY better things to do as a kid)
