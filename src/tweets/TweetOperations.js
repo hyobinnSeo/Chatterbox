@@ -250,7 +250,8 @@ class TweetOperations {
                 "\nIMPORTANT: If the timeline's subject matter is becoming repetitive (everyone is discussing the same thing), avoid that topic and talk about something else." +
                 "\nIMPORTANT: Don't use @, hashtags, or emojis. Simply write the tweet content." +
                 "\nIMPORTANT: Your response MUST be under 280 bytes. If you exceed this limit, your tweet will be truncated." +
-                "\nIMPORTANT: 트윗은 한국어로 작성하세요. (하게체나 하오체를 사용하지 마세요.)";
+                "\nIMPORTANT: 트윗은 한국어로 작성하세요. (하게체나 하오체를 사용하지 마세요.)" +
+                "\nIMPORTANT: Quotes나 예시 문장들은 문장의 스타일과 톤을 참고하는 용도로만 활용하고 그것을 재사용하거나 똑같이 반복하지 마세요.";
 
             const userPrompt = "Generate a single tweet while maintaining your historical persona. Be concise and impactful.";
 

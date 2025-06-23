@@ -169,7 +169,8 @@ class ReplyOperations {
             this.personality.guidelines + '\n' +
             `Thread context:\n${threadPrompt}\n` +
             "IMPORTANT: Keep your tweet under 280 bytes. Don't use @, hashtags, or emojis. Simply write the tweet content." +
-            "\nIMPORTANT: 트윗은 한국어로 작성하세요. (하게체나 하오체를 사용하지 마세요.)";
+            "\nIMPORTANT: 트윗은 한국어로 작성하세요. (하게체나 하오체를 사용하지 마세요.)" +
+            "\nIMPORTANT: Quotes나 예시 문장들은 문장의 스타일과 톤을 참고하는 용도로만 활용하고 그것을 재사용하거나 똑같이 반복하지 마세요.";
 
         // Different user prompts based on context and whether target is bot or user
         let userPrompt;
