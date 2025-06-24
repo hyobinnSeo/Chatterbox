@@ -14,8 +14,9 @@ const henryJackson = require('./personalities/henry-jackson');
 const andrewJackson = require('./personalities/andrew-jackson');
 const franklinPierce = require('./personalities/franklin-pierce');
 const dolleyMadison = require('./personalities/dolley-madison');
-const lucyHayes = require('./personalities/lucy-hayes');
 const mikePence = require('./personalities/mike-pence');
+const georgeHWBush = require('./personalities/george-h-w-bush');
+const danQuayle = require('./personalities/dan-quayle');
 
 // Configure target user
 const targetUser = 'libertybelltail';
@@ -112,19 +113,27 @@ const bots = [
     },
     {
         credentials: {
-            username: process.env.TWITTER_USERNAME_LUCY_HAYES,
-            password: process.env.TWITTER_PASSWORD_LUCY_HAYES,
-            email: process.env.TWITTER_EMAIL_LUCY_HAYES,
-        },
-        personality: lucyHayes
-    },
-    {
-        credentials: {
             username: process.env.TWITTER_USERNAME_MIKE_PENCE,
             password: process.env.TWITTER_PASSWORD_MIKE_PENCE,
             email: process.env.TWITTER_EMAIL_MIKE_PENCE
         },
         personality: mikePence
+    },
+    {
+        credentials: {
+            username: process.env.TWITTER_USERNAME_GEORGE_H_W_BUSH,
+            password: process.env.TWITTER_PASSWORD_GEORGE_H_W_BUSH,
+            email: process.env.TWITTER_EMAIL_GEORGE_H_W_BUSH
+        },
+        personality: georgeHWBush
+    },
+    {
+        credentials: {
+            username: process.env.TWITTER_USERNAME_DAN_QUAYLE,
+            password: process.env.TWITTER_PASSWORD_DAN_QUAYLE,
+            email: process.env.TWITTER_EMAIL_DAN_QUAYLE
+        },
+        personality: danQuayle
     }
 ];
 
