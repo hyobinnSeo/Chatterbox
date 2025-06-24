@@ -1059,25 +1059,53 @@ class ReplyOperations {
 
             // Use the bot's username from credentials (without @ symbol if present)
             const botUsername = this.currentUsername.replace('@', '');
+            const targetTweetContent = tweetData.content;
             
             console.log(`DEBUG: Looking for bot username: "${botUsername}"`);
+            console.log(`DEBUG: Target tweet content (first 100 chars): "${targetTweetContent.substring(0, 100)}..."`);
 
-            // Simple check: Does this page contain any tweet from our bot?
-            const hasReply = await this.page.evaluate((botUsername) => {
+            // Enhanced check: Find the target tweet and only check tweets below it for bot replies
+            const hasReply = await this.page.evaluate((botUsername, targetContent) => {
                 console.log(`DEBUG: Checking page for any replies from bot: "${botUsername}"`);
                 
                 // Get all tweets on this page
                 const allTweets = document.querySelectorAll('[data-testid="tweet"]');
                 console.log(`DEBUG: Found ${allTweets.length} tweets on page`);
                 
-                // Check each tweet to see if it's from our bot
+                // First, find the index of the target tweet we clicked on
+                let targetTweetIndex = -1;
                 for (let i = 0; i < allTweets.length; i++) {
+                    const tweet = allTweets[i];
+                    const contentElement = tweet.querySelector('[data-testid="tweetText"]');
+                    if (contentElement) {
+                        const tweetContent = contentElement.innerText || contentElement.textContent || '';
+                        // Check if this tweet matches our target tweet (first 100 characters for comparison)
+                        const contentMatch = tweetContent.substring(0, 100);
+                        const targetMatch = targetContent.substring(0, 100);
+                        
+                        if (contentMatch === targetMatch || tweetContent.includes(targetMatch) || targetMatch.includes(contentMatch)) {
+                            targetTweetIndex = i;
+                            console.log(`DEBUG: Found target tweet at index ${i}: "${tweetContent.substring(0, 50)}..."`);
+                            break;
+                        }
+                    }
+                }
+                
+                if (targetTweetIndex === -1) {
+                    console.log(`DEBUG: Could not find target tweet, checking all tweets except first one`);
+                    targetTweetIndex = 0; // Fallback to skip first tweet
+                }
+                
+                // Now check only tweets AFTER the target tweet (these are the replies to the target tweet)
+                console.log(`DEBUG: Checking tweets from index ${targetTweetIndex + 1} onwards for bot replies`);
+                
+                for (let i = targetTweetIndex + 1; i < allTweets.length; i++) {
                     const tweet = allTweets[i];
                     const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
                     if (!usernameElement) continue;
                     
                     const usernameText = usernameElement.innerText;
-                    console.log(`DEBUG: Tweet ${i}: User: "${usernameText}"`);
+                    console.log(`DEBUG: Reply Tweet ${i}: User: "${usernameText}"`);
                     
                     // Extract @username from the displayed text and compare
                     const atMatch = usernameText.match(/@([a-zA-Z0-9_]+)/);
@@ -1093,12 +1121,36 @@ class ReplyOperations {
                     }
                 }
                 
-                console.log(`DEBUG: No bot replies found on page`);
+                // Additional check: Look for tweets that are actually replies below the target tweet
+                const tweetsAfterTarget = Array.from(allTweets).slice(targetTweetIndex + 1);
+                const repliesWithBot = tweetsAfterTarget.filter((tweet) => {
+                    const usernameElement = tweet.querySelector('[data-testid="User-Name"]');
+                    if (!usernameElement) return false;
+                    
+                    const usernameText = usernameElement.innerText;
+                    const isFromBot = usernameText.toLowerCase().includes(botUsername.toLowerCase()) ||
+                                     usernameText.match(/@([a-zA-Z0-9_]+)/)?.[1] === botUsername;
+                    
+                    if (!isFromBot) return false;
+                    
+                    // Check if this tweet has a "Replying to" indicator or is positioned as a reply
+                    const hasReplyingTo = tweet.textContent.includes('Replying to') || 
+                                         tweet.textContent.includes('답글 대상');
+                    
+                    return hasReplyingTo || true; // Any tweet below target tweet is considered a potential reply
+                });
+                
+                if (repliesWithBot.length > 0) {
+                    console.log(`DEBUG: ✅ Found ${repliesWithBot.length} actual bot replies below target tweet`);
+                    return true;
+                }
+                
+                console.log(`DEBUG: No bot replies found below the target tweet`);
                 return false;
-            }, botUsername);
+            }, botUsername, targetTweetContent);
 
             const replyStatus = hasReply ? 'Found existing reply' : 'No existing reply found';
-            console.log(`${this.personality.name}: ${replyStatus} on this tweet page`);
+            console.log(`${this.personality.name}: ${replyStatus} below the target tweet`);
             
             return hasReply;
 
