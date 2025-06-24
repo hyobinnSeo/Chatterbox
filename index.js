@@ -20,6 +20,9 @@ const danQuayle = require('./personalities/dan-quayle');
 // Configure target user
 const targetUser = 'libertybelltail';
 
+// Operation mode
+let operationMode = 'normal'; // 'normal' or 'reply_only'
+
 // Configure bot instances
 const allBots = [
     {
@@ -224,6 +227,43 @@ function selectCharacters() {
     });
 }
 
+// Function to display operation mode selection menu
+function displayModeMenu() {
+    console.log('\n============================================================================');
+    console.log('                        운영 모드 선택');
+    console.log('============================================================================\n');
+    console.log('실행할 모드를 선택하세요:\n');
+    console.log('1. 일반 모드 (트윗 게시 및 답글)');
+    console.log('2. 답글 전용 모드 (답글만 작성)');
+    console.log('\n============================================================================');
+    console.log('선택 (1 또는 2): ');
+}
+
+// Function to handle user input for operation mode selection
+function selectOperationMode() {
+    return new Promise((resolve) => {
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+
+        displayModeMenu();
+
+        rl.question('', (answer) => {
+            const input = answer.trim();
+            if (input === '2') {
+                operationMode = 'reply_only';
+                console.log('\n✅ 답글 전용 모드가 선택되었습니다.');
+            } else {
+                operationMode = 'normal';
+                console.log('\n✅ 일반 모드가 선택되었습니다.');
+            }
+            rl.close();
+            resolve();
+        });
+    });
+}
+
 // Function to run selected bots
 async function runSelectedBots() {
     console.log('트윗 사이클을 시작합니다...');
@@ -236,7 +276,7 @@ async function runSelectedBots() {
         for (const bot of shuffledBots) {
             try {
                 const twitterBot = new TwitterBot(bot.credentials, bot.personality, allBotUsernames, targetUser);
-                await twitterBot.run();
+                await twitterBot.run(operationMode);
                 
                 // Add random delay between bots (1-5 minutes) to avoid suspicious activity
                 // const delay = Math.floor(Math.random() * (300000 - 60000) + 60000);
@@ -256,6 +296,9 @@ async function runSelectedBots() {
 // Main initialization function
 async function initialize() {
     console.log('Historical Twitter Bots 초기화 중...');
+    
+    // Operation mode selection
+    await selectOperationMode();
     
     // Character selection
     await selectCharacters();

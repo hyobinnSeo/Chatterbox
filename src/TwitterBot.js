@@ -14,7 +14,7 @@ class TwitterBot {
         this.browserManager = new BrowserManager();
     }
 
-    async run() {
+    async run(operationMode = 'normal') {
         try {
             // Initialize browser
             const page = await this.browserManager.init(__dirname);
@@ -34,8 +34,13 @@ class TwitterBot {
             await tweetOps.readFollowingTweets();
             await replyOps.replyToSpecificUser(this.targetUser);
             await replyOps.replyToBotTweets();
-            const tweet = await tweetOps.generateTweet();
-            await tweetOps.postTweet(tweet);
+
+            if (operationMode === 'normal') {
+                const tweet = await tweetOps.generateTweet();
+                await tweetOps.postTweet(tweet);
+            } else {
+                console.log(`${this.personality.name}: 답글 전용 모드이므로 트윗 게시를 건너뛰도록 합니다.`);
+            }
             await auth.logout();
             
         } catch (error) {
